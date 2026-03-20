@@ -50,7 +50,17 @@ defmodule ElixirStress.PromMetrics do
       summary("elixir_stress.run.stop.duration", unit: {:native, :millisecond}),
 
       # HTTP requests
-      summary("plug.cowboy.request.stop.duration", unit: {:native, :millisecond})
+      summary("plug.cowboy.request.stop.duration", unit: {:native, :millisecond}),
+
+      # OTel stress metrics (Tier 4)
+      counter("elixir_stress.otel.metric_flood.count",
+        tags: [:endpoint, :method],
+        description: "Metric flood events"
+      ),
+      sum("elixir_stress.otel.metric_flood.value",
+        tags: [:endpoint, :method],
+        description: "Metric flood values"
+      )
     ]
   end
 

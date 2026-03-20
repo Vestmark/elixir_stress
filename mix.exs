@@ -13,7 +13,7 @@ defmodule ElixirStress.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :os_mon],
+      extra_applications: [:logger, :os_mon, :inets, :ssl],
       mod: {ElixirStress.Application, []}
     ]
   end
@@ -33,9 +33,13 @@ defmodule ElixirStress.MixProject do
       {:opentelemetry_api, "~> 1.3"},
       {:opentelemetry_exporter, "~> 1.7"},
       {:opentelemetry_telemetry, "~> 1.1"},
+      {:opentelemetry_process_propagator, "~> 0.3"},
 
       # Prometheus metrics
-      {:telemetry_metrics_prometheus_core, "~> 1.2"}
+      {:telemetry_metrics_prometheus_core, "~> 1.2"},
+
+      # HTTP client for multi-service calls
+      {:req, "~> 0.5"}
     ]
   end
 end

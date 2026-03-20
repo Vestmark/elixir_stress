@@ -14,7 +14,7 @@ defmodule ElixirStress.Router do
     <body>
       <h1>Elixir Stress Test</h1>
       <form action="/stress" method="post">
-        <label>Full stress test (memory, CPU, disk, processes, ETS, messages, atoms, ports, binaries):</label><br><br>
+        <label>Full stress test (BEAM + OTel pipeline + distributed tracing):</label><br><br>
         <select name="duration">
           <option value="15">15 seconds</option>
           <option value="30" selected>30 seconds</option>
@@ -31,7 +31,7 @@ defmodule ElixirStress.Router do
       <br>
       <p>
         <a href="http://localhost:4002/dashboard" target="_blank">Open Phoenix LiveDashboard</a> |
-        <a href="http://localhost:3000" target="_blank">Open Grafana</a>
+        <a href="http://localhost:3404" target="_blank">Open Grafana</a>
       </p>
     </body>
     </html>
@@ -77,10 +77,23 @@ defmodule ElixirStress.Router do
         <li>2x Port churn (open/pump/close 20-60 ports)</li>
         <li>Atom growth (500-1000 atoms per batch)</li>
       </ul>
+      <h3>OTel Pipeline Stress (Tier 4)</h3>
+      <ul>
+        <li>2x Span flood (thousands of micro-spans/sec)</li>
+        <li>2x High cardinality (unique attribute values stress Tempo indexing)</li>
+        <li>Large payloads (spans with massive event data)</li>
+        <li>Metric flood (thousands of telemetry events/sec)</li>
+        <li>Log flood (structured logs flooding Loki)</li>
+      </ul>
+      <h3>Distributed Tracing (Tier 5)</h3>
+      <ul>
+        <li>2x Distributed callers (HTTP calls to worker service on :4003 with W3C traceparent propagation)</li>
+        <li>Worker service endpoints: compute, store, transform — each with nested child spans</li>
+      </ul>
       <p>Watch it live:</p>
       <ul>
         <li><a href="http://localhost:4002/dashboard" target="_blank">Phoenix LiveDashboard</a></li>
-        <li><a href="http://localhost:3000" target="_blank">Grafana (LGTM)</a></li>
+        <li><a href="http://localhost:3404" target="_blank">Grafana (LGTM)</a></li>
       </ul>
       <a href="/">Go back</a>
     </body>
@@ -111,7 +124,7 @@ defmodule ElixirStress.Router do
       <p>Spawned 10 processes each crunching 500k element lists.</p>
       <p>
         <a href="http://localhost:4002/dashboard" target="_blank">Phoenix LiveDashboard</a> |
-        <a href="http://localhost:3000" target="_blank">Grafana</a>
+        <a href="http://localhost:3404" target="_blank">Grafana</a>
       </p>
       <a href="/">Go back</a>
     </body>

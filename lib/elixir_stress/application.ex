@@ -5,10 +5,20 @@ defmodule ElixirStress.Application do
 
   @impl true
   def start(_type, _args) do
+    worker_service_spec =
+      Plug.Cowboy.child_spec(
+        scheme: :http,
+        plug: ElixirStress.WorkerService,
+        options: [port: 4003]
+      )
+      |> Map.put(:id, :worker_service_cowboy)
+
     children = [
       ElixirStress.Telemetry,
       ElixirStress.PromMetrics,
+      ElixirStress.OtelLogger,
       {Plug.Cowboy, scheme: :http, plug: ElixirStress.Router, options: [port: 4001]},
+      worker_service_spec,
       ElixirStress.Endpoint
     ]
 
