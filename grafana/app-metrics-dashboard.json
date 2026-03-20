@@ -1,0 +1,689 @@
+{
+  "dashboard": {
+    "panels": [
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 200,
+        "title": "Cycle Duration (Latency)",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: average request/operation latency per service",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 10
+            },
+            "unit": "us"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 1
+        },
+        "id": 1,
+        "targets": [
+          {
+            "expr": "rate(elixir_stress_app_cycle_duration_duration_sum[1m]) / rate(elixir_stress_app_cycle_duration_duration_count[1m])",
+            "legendFormat": "{{worker}}"
+          }
+        ],
+        "title": "Avg Cycle Duration by Worker",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: P95 latency per service (histogram_quantile)",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 10
+            },
+            "unit": "us"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 1
+        },
+        "id": 2,
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum by (worker, le) (rate(elixir_stress_app_cycle_duration_duration_bucket[1m])))",
+            "legendFormat": "p95 {{worker}}"
+          }
+        ],
+        "title": "P95 Cycle Duration by Worker",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: latency distribution heatmap",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 9
+        },
+        "id": 3,
+        "options": {
+          "calculate": false,
+          "color": {
+            "scheme": "Turbo"
+          },
+          "yAxis": {
+            "unit": "us"
+          }
+        },
+        "targets": [
+          {
+            "expr": "sum by (le) (increase(elixir_stress_app_cycle_duration_duration_bucket[30s]))",
+            "format": "heatmap",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "title": "Cycle Duration Heatmap (All Workers)",
+        "type": "heatmap"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 17
+        },
+        "id": 201,
+        "title": "Memory Operations",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: current resource utilization gauge (e.g. queue depth, cache size)",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 20,
+              "lineWidth": 2
+            },
+            "unit": "decbytes"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 18
+        },
+        "id": 4,
+        "targets": [
+          {
+            "expr": "elixir_stress_app_memory_held_bytes",
+            "legendFormat": "Held Bytes"
+          }
+        ],
+        "title": "Memory Held (Current)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: items in queue/buffer",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 20,
+              "lineWidth": 2
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 18
+        },
+        "id": 5,
+        "targets": [
+          {
+            "expr": "elixir_stress_app_memory_held_chunks",
+            "legendFormat": "Chunks Held"
+          }
+        ],
+        "title": "Memory Chunks Held",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: throughput in vs out (e.g. enqueue vs dequeue rate)",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 10
+            },
+            "unit": "Bps"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Released"
+              },
+              "properties": [
+                {
+                  "id": "custom.transform",
+                  "value": "negative-Y"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 18
+        },
+        "id": 6,
+        "targets": [
+          {
+            "expr": "rate(elixir_stress_app_memory_allocated_bytes_total[1m])",
+            "legendFormat": "Allocated"
+          },
+          {
+            "expr": "rate(elixir_stress_app_memory_released_bytes_total[1m])",
+            "legendFormat": "Released"
+          }
+        ],
+        "title": "Memory Allocated vs Released (rate/s)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: total throughput counter",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "decbytes"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 26
+        },
+        "id": 7,
+        "targets": [
+          {
+            "expr": "elixir_stress_app_memory_allocated_bytes_total",
+            "legendFormat": "Total Allocated"
+          }
+        ],
+        "title": "Cumulative Memory Allocated",
+        "type": "stat"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 30
+        },
+        "id": 202,
+        "title": "Disk I/O Throughput",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: write throughput to external storage",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 15,
+              "lineWidth": 2
+            },
+            "unit": "Bps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 31
+        },
+        "id": 8,
+        "targets": [
+          {
+            "expr": "rate(elixir_stress_app_disk_written_bytes_total[1m])",
+            "legendFormat": "Write B/s"
+          }
+        ],
+        "title": "Disk Write Rate",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: read throughput from external storage",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 15,
+              "lineWidth": 2
+            },
+            "unit": "Bps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 31
+        },
+        "id": 9,
+        "targets": [
+          {
+            "expr": "rate(elixir_stress_app_disk_read_bytes_total[1m])",
+            "legendFormat": "Read B/s"
+          }
+        ],
+        "title": "Disk Read Rate",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "decbytes"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 12,
+          "x": 0,
+          "y": 39
+        },
+        "id": 10,
+        "targets": [
+          {
+            "expr": "elixir_stress_app_disk_written_bytes_total",
+            "legendFormat": "Written"
+          },
+          {
+            "expr": "elixir_stress_app_disk_read_bytes_total",
+            "legendFormat": "Read"
+          }
+        ],
+        "title": "Cumulative Disk I/O",
+        "type": "stat"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 43
+        },
+        "id": 203,
+        "title": "Process & Concurrency Churn",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: active connections / workers / goroutines gauge",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "continuous-blues"
+            },
+            "custom": {
+              "fillOpacity": 20,
+              "gradientMode": "scheme",
+              "lineWidth": 2
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 44
+        },
+        "id": 11,
+        "targets": [
+          {
+            "expr": "elixir_stress_app_processes_alive_count",
+            "legendFormat": "Alive"
+          }
+        ],
+        "title": "Processes Alive (Current)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: connection open vs close rate",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Killed"
+              },
+              "properties": [
+                {
+                  "id": "custom.transform",
+                  "value": "negative-Y"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 44
+        },
+        "id": 12,
+        "targets": [
+          {
+            "expr": "rate(elixir_stress_app_processes_spawned_count_total[1m])",
+            "legendFormat": "Spawned"
+          },
+          {
+            "expr": "rate(elixir_stress_app_processes_killed_count_total[1m])",
+            "legendFormat": "Killed"
+          }
+        ],
+        "title": "Processes Spawned vs Killed (rate/s)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: message/event throughput",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 15,
+              "lineWidth": 2
+            },
+            "unit": "cps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 44
+        },
+        "id": 13,
+        "targets": [
+          {
+            "expr": "rate(elixir_stress_app_messages_sent_count_total[1m])",
+            "legendFormat": "Messages/s"
+          }
+        ],
+        "title": "Messages Sent Rate",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: external resource acquisition/release rate",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 10
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 52
+        },
+        "id": 14,
+        "targets": [
+          {
+            "expr": "rate(elixir_stress_app_ports_opened_count_total[1m])",
+            "legendFormat": "Opened/s"
+          },
+          {
+            "expr": "rate(elixir_stress_app_ports_closed_count_total[1m])",
+            "legendFormat": "Closed/s"
+          }
+        ],
+        "title": "Ports Opened/Closed Rate",
+        "type": "timeseries"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 60
+        },
+        "id": 204,
+        "title": "Distributed Call Performance",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: downstream service latency by endpoint",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 10
+            },
+            "unit": "ms"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 61
+        },
+        "id": 15,
+        "targets": [
+          {
+            "expr": "rate(elixir_stress_app_distributed_call_duration_sum[1m]) / rate(elixir_stress_app_distributed_call_duration_count[1m])",
+            "legendFormat": "{{endpoint}} ({{status}})"
+          }
+        ],
+        "title": "Distributed Call Avg Latency by Endpoint",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: P95 downstream latency",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 10
+            },
+            "unit": "ms"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 61
+        },
+        "id": 16,
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum by (endpoint, le) (rate(elixir_stress_app_distributed_call_duration_bucket[1m])))",
+            "legendFormat": "p95 {{endpoint}}"
+          }
+        ],
+        "title": "Distributed Call P95 Latency",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: request rate per endpoint (RED method - Rate)",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "fillOpacity": 10
+            },
+            "unit": "reqps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 69
+        },
+        "id": 17,
+        "targets": [
+          {
+            "expr": "sum by (endpoint) (rate(elixir_stress_app_distributed_call_count_total[1m]))",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "title": "Distributed Call Rate by Endpoint",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "uid": "prometheus"
+        },
+        "description": "Template: error rate per endpoint (RED method - Errors)",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "fixedColor": "red",
+              "mode": "fixed"
+            },
+            "custom": {
+              "fillOpacity": 10,
+              "lineWidth": 2
+            },
+            "unit": "reqps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 69
+        },
+        "id": 18,
+        "targets": [
+          {
+            "expr": "sum by (endpoint) (rate(elixir_stress_app_distributed_error_count_total[1m]))",
+            "legendFormat": "errors: {{endpoint}}"
+          }
+        ],
+        "title": "Distributed Call Errors",
+        "type": "timeseries"
+      }
+    ],
+    "refresh": "5s",
+    "tags": [
+      "elixir",
+      "stress",
+      "application"
+    ],
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "timezone": "browser",
+    "title": "Elixir Stress - Application Metrics",
+    "uid": "elixir-app-metrics"
+  },
+  "overwrite": true
+}

@@ -62,22 +62,26 @@ This starts three HTTP services:
 | 4002 | Phoenix LiveDashboard | http://localhost:4002/dashboard |
 | 4003 | Worker service (Tier 5) | http://localhost:4003/work/* |
 
-### 4. Open Grafana and load the dashboard
+### 4. Load the Grafana dashboards
 
 Open Grafana at **http://localhost:3404** (login: `admin` / `admin`).
 
-The stress test dashboard is auto-provisioned via the API when you follow the setup above. Navigate to:
-
-**http://localhost:3404/d/elixir-stress-test/elixir-stress-test**
-
-If the dashboard doesn't exist yet, you can create it by running:
+Import the two dashboards from the `grafana/` directory:
 
 ```bash
+# Infrastructure + OTel overview dashboard
 curl -u admin:admin -X POST -H "Content-Type: application/json" \
-  -d @/tmp/dashboard.json http://localhost:3404/api/dashboards/db
+  -d @grafana/stress-test-dashboard.json http://localhost:3404/api/dashboards/db
+
+# Application metrics dashboard
+curl -u admin:admin -X POST -H "Content-Type: application/json" \
+  -d @grafana/app-metrics-dashboard.json http://localhost:3404/api/dashboards/db
 ```
 
-(The dashboard JSON is created during initial setup by the project tooling.)
+The dashboards will be available at:
+
+- **http://localhost:3404/d/elixir-stress-test** — BEAM resources, worker activity, traces, logs, OTel pipeline stress
+- **http://localhost:3404/d/elixir-app-metrics** — application-level metrics (latency histograms, throughput, gauges)
 
 ### 5. Run a stress test
 
@@ -225,6 +229,9 @@ The worker service exposes three endpoints, each with nested child spans:
 elixir_stress/
 ├── config/
 │   └── config.exs                 # Phoenix endpoint + OpenTelemetry config
+├── grafana/
+│   ├── stress-test-dashboard.json # Grafana dashboard: infrastructure + OTel overview
+│   └── app-metrics-dashboard.json # Grafana dashboard: application metrics
 ├── lib/
 │   ├── elixir_stress.ex
 │   └── elixir_stress/
