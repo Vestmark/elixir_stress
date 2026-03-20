@@ -23,14 +23,14 @@ defmodule ElixirStress.Router do
         .tooltip-wrap { position: relative; display: inline-block; }
         .tooltip-wrap .tooltip {
           visibility: hidden; opacity: 0;
-          position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%);
+          position: absolute; z-index: 10; top: 125%; left: 50%; transform: translateX(-50%);
           width: 420px; max-height: 80vh; overflow-y: auto; padding: 16px; background: #1a1a2e; color: #eee; border-radius: 8px;
           font-size: 12px; line-height: 1.4; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
           transition: opacity 0.2s, visibility 0.2s;
         }
         .tooltip-wrap .tooltip::after {
-          content: ""; position: absolute; top: 100%; left: 50%; margin-left: -8px;
-          border-width: 8px; border-style: solid; border-color: #1a1a2e transparent transparent transparent;
+          content: ""; position: absolute; bottom: 100%; left: 50%; margin-left: -8px;
+          border-width: 8px; border-style: solid; border-color: transparent transparent #1a1a2e transparent;
         }
         .tooltip-wrap:hover .tooltip { visibility: visible; opacity: 1; }
         .tooltip h4 { margin: 0 0 8px 0; color: #b794f4; font-size: 14px; }
