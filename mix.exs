@@ -26,7 +26,16 @@ defmodule ElixirStress.MixProject do
       {:phoenix_live_dashboard, "~> 0.8"},
       {:jason, "~> 1.4"},
       {:telemetry_metrics, "~> 1.0"},
-      {:telemetry_poller, "~> 1.1"}
+      {:telemetry_poller, "~> 1.1"},
+
+      # OpenTelemetry
+      {:opentelemetry, "~> 1.4"},
+      {:opentelemetry_api, "~> 1.3"},
+      {:opentelemetry_exporter, "~> 1.7"},
+      {:opentelemetry_telemetry, "~> 1.1"},
+
+      # Prometheus metrics
+      {:telemetry_metrics_prometheus_core, "~> 1.2"}
     ]
   end
 end

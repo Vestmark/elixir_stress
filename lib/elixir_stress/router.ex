@@ -1,5 +1,6 @@
 defmodule ElixirStress.Router do
   use Plug.Router
+  require OpenTelemetry.Tracer, as: Tracer
 
   plug Plug.Parsers, parsers: [:urlencoded]
   plug :match
@@ -28,7 +29,10 @@ defmodule ElixirStress.Router do
         <button type="submit">Run Busy Loop</button>
       </form>
       <br>
-      <p><a href="http://localhost:4002/dashboard" target="_blank">Open Phoenix LiveDashboard</a></p>
+      <p>
+        <a href="http://localhost:4002/dashboard" target="_blank">Open Phoenix LiveDashboard</a> |
+        <a href="http://localhost:3000" target="_blank">Open Grafana</a>
+      </p>
     </body>
     </html>
     """
@@ -38,10 +42,21 @@ defmodule ElixirStress.Router do
     |> send_resp(200, html)
   end
 
+  get "/metrics" do
+    metrics = ElixirStress.PromMetrics.scrape()
+
+    conn
+    |> put_resp_content_type("text/plain")
+    |> send_resp(200, metrics)
+  end
+
   post "/stress" do
     duration = String.to_integer(conn.body_params["duration"] || "30")
 
-    spawn(fn -> ElixirStress.Stress.run(duration) end)
+    Tracer.with_span "stress_test.trigger", attributes: %{duration: duration} do
+      :telemetry.execute([:elixir_stress, :run, :start], %{}, %{duration: duration})
+      spawn(fn -> ElixirStress.Stress.run(duration) end)
+    end
 
     html = """
     <!DOCTYPE html>
@@ -62,7 +77,11 @@ defmodule ElixirStress.Router do
         <li>2x Port churn (open/pump/close 20-60 ports)</li>
         <li>Atom growth (500-1000 atoms per batch)</li>
       </ul>
-      <p>Watch it live: <a href="http://localhost:4002/dashboard" target="_blank">Open Dashboard</a></p>
+      <p>Watch it live:</p>
+      <ul>
+        <li><a href="http://localhost:4002/dashboard" target="_blank">Phoenix LiveDashboard</a></li>
+        <li><a href="http://localhost:3000" target="_blank">Grafana (LGTM)</a></li>
+      </ul>
       <a href="/">Go back</a>
     </body>
     </html>
@@ -74,11 +93,13 @@ defmodule ElixirStress.Router do
   end
 
   post "/burn" do
-    for _ <- 1..10 do
-      spawn(fn ->
-        list = Enum.to_list(1..500_000)
-        Enum.each(1..20, fn _ -> Enum.sum(list) end)
-      end)
+    Tracer.with_span "burn.trigger" do
+      for _ <- 1..10 do
+        spawn(fn ->
+          list = Enum.to_list(1..500_000)
+          Enum.each(1..20, fn _ -> Enum.sum(list) end)
+        end)
+      end
     end
 
     html = """
@@ -87,7 +108,11 @@ defmodule ElixirStress.Router do
     <head><title>Burning!</title></head>
     <body>
       <h1>Busy loop started!</h1>
-      <p>Spawned 10 processes each crunching 500k element lists. Check the <a href="http://localhost:4002/dashboard" target="_blank">dashboard</a> to see the spike.</p>
+      <p>Spawned 10 processes each crunching 500k element lists.</p>
+      <p>
+        <a href="http://localhost:4002/dashboard" target="_blank">Phoenix LiveDashboard</a> |
+        <a href="http://localhost:3000" target="_blank">Grafana</a>
+      </p>
       <a href="/">Go back</a>
     </body>
     </html>

@@ -7,6 +7,7 @@ defmodule ElixirStress.Application do
   def start(_type, _args) do
     children = [
       ElixirStress.Telemetry,
+      ElixirStress.PromMetrics,
       {Plug.Cowboy, scheme: :http, plug: ElixirStress.Router, options: [port: 4001]},
       ElixirStress.Endpoint
     ]

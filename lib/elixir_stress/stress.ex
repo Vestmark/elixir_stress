@@ -1,57 +1,86 @@
 defmodule ElixirStress.Stress do
   @moduledoc false
+  require OpenTelemetry.Tracer, as: Tracer
 
   @tmp_dir "/tmp/elixir_stress"
 
   def run(duration_seconds \\ 30) do
-    File.mkdir_p!(@tmp_dir)
+    Tracer.with_span "stress_test.run", attributes: %{duration_seconds: duration_seconds} do
+      start_time = System.monotonic_time()
+      File.mkdir_p!(@tmp_dir)
 
-    # Shared ETS that persists for the duration — visible in ETS tab
-    shared = :ets.new(:stress_shared, [:public, :set, :named_table,
-      read_concurrency: true, write_concurrency: true])
+      # Shared ETS that persists for the duration — visible in ETS tab
+      shared = :ets.new(:stress_shared, [:public, :set, :named_table,
+        read_concurrency: true, write_concurrency: true])
 
-    workers =
-      # 10 memory hogs — each holds hundreds of MB
-      replicate(10, fn -> memory_hog(duration_seconds) end) ++
-      # CPU burners — saturate all schedulers
-      replicate(System.schedulers_online() * 2, fn -> cpu_saturate(duration_seconds) end) ++
-      # 4 disk thrashers
-      replicate(4, fn -> disk_thrash(duration_seconds) end) ++
-      # Process explosion
-      replicate(2, fn -> process_explosion(duration_seconds) end) ++
-      # ETS bloat
-      replicate(2, fn -> ets_bloat(duration_seconds, shared) end) ++
-      # GC torture
-      replicate(4, fn -> gc_torture(duration_seconds) end) ++
-      # Binary heap abuse
-      replicate(4, fn -> binary_abuse(duration_seconds) end) ++
-      # Message queue backup
-      replicate(2, fn -> message_queue_pressure(duration_seconds) end) ++
-      # Port churn
-      replicate(2, fn -> port_churn(duration_seconds) end) ++
-      # Atom growth
-      [Task.async(fn -> atom_growth(duration_seconds) end)]
+      workers =
+        # 10 memory hogs — each holds hundreds of MB
+        replicate(10, :memory_hog, fn -> traced_worker(:memory_hog, duration_seconds) end) ++
+        # CPU burners — saturate all schedulers
+        replicate(System.schedulers_online() * 2, :cpu_saturate, fn -> traced_worker(:cpu_saturate, duration_seconds) end) ++
+        # 4 disk thrashers
+        replicate(4, :disk_thrash, fn -> traced_worker(:disk_thrash, duration_seconds) end) ++
+        # Process explosion
+        replicate(2, :process_explosion, fn -> traced_worker(:process_explosion, duration_seconds) end) ++
+        # ETS bloat
+        replicate(2, :ets_bloat, fn -> traced_worker_with_arg(:ets_bloat, duration_seconds, shared) end) ++
+        # GC torture
+        replicate(4, :gc_torture, fn -> traced_worker(:gc_torture, duration_seconds) end) ++
+        # Binary heap abuse
+        replicate(4, :binary_abuse, fn -> traced_worker(:binary_abuse, duration_seconds) end) ++
+        # Message queue backup
+        replicate(2, :message_queue_pressure, fn -> traced_worker(:message_queue_pressure, duration_seconds) end) ++
+        # Port churn
+        replicate(2, :port_churn, fn -> traced_worker(:port_churn, duration_seconds) end) ++
+        # Atom growth
+        [Task.async(fn -> traced_worker(:atom_growth, duration_seconds) end)]
 
-    results = Task.yield_many(workers, :timer.seconds(duration_seconds + 30))
+      results = Task.yield_many(workers, :timer.seconds(duration_seconds + 30))
 
-    File.rm_rf!(@tmp_dir)
-    try do :ets.delete(shared) rescue _ -> :ok end
+      File.rm_rf!(@tmp_dir)
+      try do :ets.delete(shared) rescue _ -> :ok end
 
-    Enum.map(results, fn {task, res} ->
-      case res do
-        {:ok, val} -> val
-        nil -> Task.shutdown(task, :brutal_kill); :timeout
-      end
-    end)
+      duration = System.monotonic_time() - start_time
+      :telemetry.execute([:elixir_stress, :run, :stop], %{duration: duration}, %{duration_seconds: duration_seconds})
+
+      Enum.map(results, fn {task, res} ->
+        case res do
+          {:ok, val} -> val
+          nil -> Task.shutdown(task, :brutal_kill); :timeout
+        end
+      end)
+    end
   end
 
-  defp replicate(n, fun), do: for(_ <- 1..n, do: Task.async(fun))
+  defp replicate(n, _name, fun), do: for(_ <- 1..n, do: Task.async(fun))
+
+  defp traced_worker(worker_name, duration_seconds) do
+    Tracer.with_span "stress.worker.#{worker_name}", attributes: %{worker: Atom.to_string(worker_name)} do
+      :telemetry.execute([:elixir_stress, :worker, :start], %{count: 1}, %{worker: Atom.to_string(worker_name)})
+      result = apply(__MODULE__, :"do_#{worker_name}", [duration_seconds])
+      :telemetry.execute([:elixir_stress, :worker, :stop], %{count: 1}, %{worker: Atom.to_string(worker_name)})
+      result
+    end
+  end
+
+  defp traced_worker_with_arg(worker_name, duration_seconds, arg) do
+    Tracer.with_span "stress.worker.#{worker_name}", attributes: %{worker: Atom.to_string(worker_name)} do
+      :telemetry.execute([:elixir_stress, :worker, :start], %{count: 1}, %{worker: Atom.to_string(worker_name)})
+      result = apply(__MODULE__, :"do_#{worker_name}", [duration_seconds, arg])
+      :telemetry.execute([:elixir_stress, :worker, :stop], %{count: 1}, %{worker: Atom.to_string(worker_name)})
+      result
+    end
+  end
+
+  defp emit_cycle(worker_name) do
+    :telemetry.execute([:elixir_stress, :worker, :cycle], %{count: 1, value: 1}, %{worker: Atom.to_string(worker_name)})
+  end
 
   # ============================================================
   # MEMORY HOG — each worker holds 50-200MB in its process heap
   # This WILL show up on the Home tab memory gauges
   # ============================================================
-  defp memory_hog(seconds) do
+  def do_memory_hog(seconds) do
     deadline = deadline(seconds)
     memory_hog_loop(deadline, [], 0)
   end
@@ -89,6 +118,7 @@ defmodule ElixirStress.Stress do
         held
       end
 
+      emit_cycle(:memory_hog)
       memory_hog_loop(deadline, held, cycles + 1)
     end
   end
@@ -106,7 +136,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # CPU SATURATE — tight loops that pin schedulers at 100%
   # ============================================================
-  defp cpu_saturate(seconds) do
+  def do_cpu_saturate(seconds) do
     deadline = deadline(seconds)
     cpu_saturate_loop(deadline, 0)
   end
@@ -143,6 +173,7 @@ defmodule ElixirStress.Stress do
           |> Enum.map(&Enum.sum/1)
       end
 
+      emit_cycle(:cpu_saturate)
       cpu_saturate_loop(deadline, cycles + 1)
     )
   end
@@ -163,7 +194,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # DISK THRASH
   # ============================================================
-  defp disk_thrash(seconds) do
+  def do_disk_thrash(seconds) do
     deadline = deadline(seconds)
     disk_thrash_loop(deadline, 0)
   end
@@ -188,6 +219,7 @@ defmodule ElixirStress.Stress do
       end
 
       File.rm(path)
+      emit_cycle(:disk_thrash)
       disk_thrash_loop(deadline, cycles + 1)
     )
   end
@@ -195,7 +227,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # PROCESS EXPLOSION
   # ============================================================
-  defp process_explosion(seconds) do
+  def do_process_explosion(seconds) do
     deadline = deadline(seconds)
     explosion_loop(deadline, [], 0)
   end
@@ -217,8 +249,10 @@ defmodule ElixirStress.Stress do
       if length(alive) > 20_000 do
         {to_kill, to_keep} = Enum.split(alive, 10_000)
         Enum.each(to_kill, fn pid -> Process.exit(pid, :kill) end)
+        emit_cycle(:process_explosion)
         explosion_loop(deadline, to_keep, cycles + 1)
       else
+        emit_cycle(:process_explosion)
         explosion_loop(deadline, alive, cycles + 1)
       end
     end
@@ -227,7 +261,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # ETS BLOAT
   # ============================================================
-  defp ets_bloat(seconds, shared) do
+  def do_ets_bloat(seconds, shared) do
     deadline = deadline(seconds)
     tables = for _ <- 1..5 do
       :ets.new(:bloat, [Enum.random([:set, :ordered_set, :bag]), :public])
@@ -267,6 +301,7 @@ defmodule ElixirStress.Stress do
           end)
       end
 
+      emit_cycle(:ets_bloat)
       ets_bloat_loop(deadline, tables, cycles + 1)
     end
   end
@@ -274,7 +309,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # GC TORTURE
   # ============================================================
-  defp gc_torture(seconds) do
+  def do_gc_torture(seconds) do
     deadline = deadline(seconds)
     gc_torture_loop(deadline, 0)
   end
@@ -313,6 +348,7 @@ defmodule ElixirStress.Stress do
         receive do {:DOWN, ^ref, _, _, _} -> :ok after 2000 -> :ok end
       end)
 
+      emit_cycle(:gc_torture)
       gc_torture_loop(deadline, cycles + 1)
     )
   end
@@ -320,7 +356,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # BINARY ABUSE
   # ============================================================
-  defp binary_abuse(seconds) do
+  def do_binary_abuse(seconds) do
     deadline = deadline(seconds)
     binary_abuse_loop(deadline, [], 0)
   end
@@ -353,6 +389,7 @@ defmodule ElixirStress.Stress do
 
       Enum.each(held, fn b -> :erlang.phash2(b) end)
 
+      emit_cycle(:binary_abuse)
       binary_abuse_loop(deadline, held, cycles + 1)
     )
   end
@@ -360,7 +397,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # MESSAGE QUEUE PRESSURE
   # ============================================================
-  defp message_queue_pressure(seconds) do
+  def do_message_queue_pressure(seconds) do
     deadline = deadline(seconds)
     msg_pressure_loop(deadline, 0)
   end
@@ -388,6 +425,7 @@ defmodule ElixirStress.Stress do
         if Process.alive?(pid), do: Process.exit(pid, :kill)
       end)
 
+      emit_cycle(:message_queue_pressure)
       msg_pressure_loop(deadline, cycles + 1)
     )
   end
@@ -406,7 +444,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # PORT CHURN
   # ============================================================
-  defp port_churn(seconds) do
+  def do_port_churn(seconds) do
     deadline = deadline(seconds)
     port_churn_loop(deadline, 0)
   end
@@ -430,6 +468,7 @@ defmodule ElixirStress.Stress do
       Process.sleep(Enum.random([50, 100]))
       Enum.each(ports, fn port -> try do Port.close(port) rescue _ -> :ok end end)
 
+      emit_cycle(:port_churn)
       port_churn_loop(deadline, cycles + 1)
     )
   end
@@ -437,7 +476,7 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # ATOM GROWTH
   # ============================================================
-  defp atom_growth(seconds) do
+  def do_atom_growth(seconds) do
     deadline = deadline(seconds)
     atom_loop(deadline, 0)
   end
@@ -449,6 +488,7 @@ defmodule ElixirStress.Stress do
         String.to_atom("stress_#{:erlang.unique_integer([:positive])}")
       end)
       Process.sleep(Enum.random([10, 30]))
+      emit_cycle(:atom_growth)
       atom_loop(deadline, cycles + 1)
     )
   end
