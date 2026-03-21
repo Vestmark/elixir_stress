@@ -6,9 +6,47 @@ A BEAM VM stress testing tool with full observability: Phoenix LiveDashboard, Gr
 
 - Elixir ~> 1.19
 - Erlang/OTP
-- Docker Desktop (for Grafana LGTM stack)
+- Docker (Desktop on macOS, Engine on Linux) for the Grafana LGTM stack
 
-## Quick Start
+## Automated Setup (Recommended)
+
+Setup scripts install all prerequisites, start Docker/Grafana, compile the app, and open the browser — one command to go from zero to running.
+
+### macOS
+
+```bash
+./setupMac.sh
+```
+
+Installs (if missing): Homebrew → Erlang → Elixir → Docker Desktop check → Zscaler TLS proxy fix → mix deps → Grafana LGTM → Elixir app.
+
+### Linux (Ubuntu/Debian, Fedora/RHEL/CentOS)
+
+```bash
+./setupLinux.sh
+```
+
+Installs (if missing): build tools → Erlang → Elixir (via apt/dnf/yum or asdf) → Docker Engine → Docker Compose plugin → Grafana LGTM → Elixir app.
+
+### Script Flags
+
+| Flag | What it does |
+|------|-------------|
+| *(no flag)* | Full install + start everything |
+| `--start` | Skip installs, just start Docker + app |
+| `--stop` | Stop Elixir app + docker compose down |
+| `--status` | Show what's running and all URLs |
+
+Example:
+```bash
+./setupMac.sh --status    # Check if everything is up
+./setupMac.sh --stop      # Shut it all down
+./setupLinux.sh --start   # Quick restart (skip installs)
+```
+
+## Manual Setup
+
+If you prefer to set things up step by step:
 
 ### 1. Install dependencies
 
@@ -18,7 +56,7 @@ mix deps.get
 mix compile
 ```
 
-**Note:** If behind a corporate TLS proxy (e.g. Zscaler):
+**Note:** If behind a corporate TLS proxy (e.g. Zscaler) on macOS:
 
 ```bash
 security find-certificate -a -p /Library/Keychains/System.keychain \
@@ -29,7 +67,7 @@ HEX_CACERTS_PATH=/tmp/all_cas.pem mix deps.get
 
 ### 2. Start the Grafana LGTM stack (Docker)
 
-Make sure Docker Desktop is running, then:
+Make sure Docker is running, then:
 
 ```bash
 docker compose up -d
@@ -41,6 +79,8 @@ This starts a single container (`grafana/otel-lgtm`) with:
 - **Tempo** on port 4418 (distributed trace storage)
 - **Loki** on port 3100 (structured log storage)
 - **OTel Collector** on ports 4317 (gRPC) and 4318 (HTTP) — receives traces/metrics/logs from the app and scrapes `/metrics` every 5s
+
+Grafana dashboards are **automatically provisioned** — they load on container start via volume mounts, no manual import needed.
 
 Wait ~10 seconds for the container to become healthy:
 
@@ -62,26 +102,14 @@ This starts three HTTP services:
 | 4002 | Phoenix LiveDashboard | http://localhost:4002/dashboard |
 | 4003 | Worker service (Tier 5) | http://localhost:4003/work/* |
 
-### 4. Load the Grafana dashboards
+### 4. Open the dashboards
 
-Open Grafana at **http://localhost:3404** (login: `admin` / `admin`).
-
-Import the two dashboards from the `grafana/` directory:
-
-```bash
-# Infrastructure + OTel overview dashboard
-curl -u admin:admin -X POST -H "Content-Type: application/json" \
-  -d @grafana/stress-test-dashboard.json http://localhost:3404/api/dashboards/db
-
-# Application metrics dashboard
-curl -u admin:admin -X POST -H "Content-Type: application/json" \
-  -d @grafana/app-metrics-dashboard.json http://localhost:3404/api/dashboards/db
-```
-
-The dashboards will be available at:
+Grafana dashboards are pre-loaded and available at:
 
 - **http://localhost:3404/d/elixir-stress-test** — BEAM resources, worker activity, traces, logs, OTel pipeline stress
 - **http://localhost:3404/d/elixir-app-metrics** — application-level metrics (latency histograms, throughput, gauges)
+
+Login: `admin` / `admin`
 
 ### 5. Run a stress test
 
@@ -230,8 +258,14 @@ elixir_stress/
 ├── config/
 │   └── config.exs                 # Phoenix endpoint + OpenTelemetry config
 ├── grafana/
-│   ├── stress-test-dashboard.json # Grafana dashboard: infrastructure + OTel overview
-│   └── app-metrics-dashboard.json # Grafana dashboard: application metrics
+│   ├── dashboards/                # Provisioned dashboard JSON (auto-loaded by Grafana)
+│   │   ├── stress-test-dashboard.json
+│   │   └── app-metrics-dashboard.json
+│   ├── provisioning/
+│   │   └── dashboards/
+│   │       └── dashboards.yml     # Grafana provisioning config
+│   ├── stress-test-dashboard.json # API-format JSON (for manual import)
+│   └── app-metrics-dashboard.json
 ├── lib/
 │   ├── elixir_stress.ex
 │   └── elixir_stress/
@@ -245,8 +279,10 @@ elixir_stress/
 │       ├── otel_stress.ex         # Tier 4: OTel pipeline stress workers
 │       ├── worker_service.ex      # Tier 5: Downstream microservice (:4003)
 │       └── stress.ex              # Main stress test suite with deep tracing
-├── docker-compose.yml             # Grafana LGTM stack
+├── docker-compose.yml             # Grafana LGTM stack (with dashboard provisioning)
 ├── otel-collector-config.yml      # OTel Collector: receivers, exporters, pipelines
+├── setupMac.sh                    # One-command setup for macOS
+├── setupLinux.sh                  # One-command setup for Linux
 ├── mix.exs
 └── README.md
 ```
@@ -254,9 +290,11 @@ elixir_stress/
 ## Stopping
 
 ```bash
-# Stop the Elixir app
-Ctrl+C (twice)
+# Using setup scripts (recommended)
+./setupMac.sh --stop     # macOS
+./setupLinux.sh --stop   # Linux
 
-# Stop Grafana/LGTM
-docker compose down
+# Or manually
+Ctrl+C (twice)           # Stop the Elixir app
+docker compose down      # Stop Grafana/LGTM
 ```
