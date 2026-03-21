@@ -43,6 +43,10 @@ defmodule ElixirStress.Router do
         .links a { color: #6e4aad; text-decoration: none; font-weight: 500; }
         .links a:hover { text-decoration: underline; }
         .duration-info { font-size: 12px; color: #888; margin-top: 4px; }
+        .custom-duration { display: none; align-items: center; gap: 6px; margin-top: 8px; }
+        .custom-duration.visible { display: flex; }
+        .custom-duration input { width: 60px; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
+        .custom-duration label { font-size: 13px; color: #666; }
       </style>
     </head>
     <body>
@@ -87,12 +91,14 @@ defmodule ElixirStress.Router do
             </span>
           </span>
         </h3>
-        <form action="/stress" method="post">
-          <select name="duration" id="duration-select">
+        <form action="/stress" method="post" onsubmit="return setDuration('stress')">
+          <input type="hidden" name="duration" id="stress-duration-val">
+          <select id="stress-select" onchange="toggleCustom('stress')">
             <option value="15">15 seconds</option>
             <option value="30" selected>30 seconds</option>
             <option value="60">60 seconds</option>
             <option value="120">2 minutes</option>
+            <option value="custom">Custom</option>
           </select>
           <span class="tooltip-wrap">
             <span class="info-icon">?</span>
@@ -106,7 +112,11 @@ defmodule ElixirStress.Router do
               </ul>
             </span>
           </span>
-          <br><br>
+          <div class="custom-duration" id="stress-custom">
+            <input type="number" id="stress-min" min="0" max="59" value="0" placeholder="0"><label>min</label>
+            <input type="number" id="stress-sec" min="0" max="59" value="30" placeholder="30"><label>sec</label>
+          </div>
+          <br>
           <button type="submit">Run Full Stress Test</button>
         </form>
       </div>
@@ -129,7 +139,20 @@ defmodule ElixirStress.Router do
             </span>
           </span>
         </h3>
-        <form action="/burn" method="post">
+        <form action="/burn" method="post" onsubmit="return setDuration('burn')">
+          <input type="hidden" name="duration" id="burn-duration-val">
+          <select id="burn-select" onchange="toggleCustom('burn')">
+            <option value="5" selected>5 seconds</option>
+            <option value="10">10 seconds</option>
+            <option value="15">15 seconds</option>
+            <option value="30">30 seconds</option>
+            <option value="custom">Custom</option>
+          </select>
+          <div class="custom-duration" id="burn-custom">
+            <input type="number" id="burn-min" min="0" max="59" value="0" placeholder="0"><label>min</label>
+            <input type="number" id="burn-sec" min="0" max="59" value="5" placeholder="5"><label>sec</label>
+          </div>
+          <br>
           <button type="submit">Run Quick Burn</button>
         </form>
       </div>
@@ -139,6 +162,27 @@ defmodule ElixirStress.Router do
         <a href="http://localhost:3404/d/elixir-stress-test" target="_blank">Grafana: Stress Test</a> &nbsp;|&nbsp;
         <a href="http://localhost:3404/d/elixir-app-metrics" target="_blank">Grafana: App Metrics</a>
       </div>
+      <script>
+        function toggleCustom(prefix) {
+          var sel = document.getElementById(prefix + '-select');
+          var custom = document.getElementById(prefix + '-custom');
+          custom.classList.toggle('visible', sel.value === 'custom');
+        }
+        function setDuration(prefix) {
+          var sel = document.getElementById(prefix + '-select');
+          var hidden = document.getElementById(prefix + '-duration-val');
+          if (sel.value === 'custom') {
+            var m = parseInt(document.getElementById(prefix + '-min').value) || 0;
+            var s = parseInt(document.getElementById(prefix + '-sec').value) || 0;
+            var total = m * 60 + s;
+            if (total < 1) { alert('Enter at least 1 second'); return false; }
+            hidden.value = total;
+          } else {
+            hidden.value = sel.value;
+          }
+          return true;
+        }
+      </script>
     </body>
     </html>
     """
@@ -167,41 +211,63 @@ defmodule ElixirStress.Router do
     html = """
     <!DOCTYPE html>
     <html>
-    <head><title>Stress Test Running</title></head>
+    <head>
+      <title>Stress Test Running</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .container { text-align: center; padding: 40px; }
+        h1 { font-size: 20px; font-weight: 500; color: #b794f4; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 40px; }
+        .timer-row { display: flex; gap: 60px; justify-content: center; align-items: baseline; margin-bottom: 12px; }
+        .timer-block { text-align: center; }
+        .timer-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #666; margin-bottom: 8px; }
+        .timer-value { font-size: 64px; font-weight: 200; font-variant-numeric: tabular-nums; color: #fff; }
+        .timer-value.countdown { color: #b794f4; }
+
+        .progress-track { width: 300px; height: 2px; background: #1a1a2e; border-radius: 1px; margin: 30px auto; overflow: hidden; }
+        .progress-bar { height: 100%; background: #b794f4; border-radius: 1px; transition: width 1s linear; }
+        .status { font-size: 13px; color: #555; margin-bottom: 40px; }
+        .links { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+        .links a { color: #666; text-decoration: none; font-size: 13px; transition: color 0.2s; }
+        .links a:hover { color: #b794f4; }
+      </style>
+    </head>
     <body>
-      <h1>Full Stress Test Started!</h1>
-      <p>Running for #{duration} seconds with:</p>
-      <ul>
-        <li>10x Memory hogs (hold tens to hundreds of MB each)</li>
-        <li>CPU saturate (2x schedulers — primes, sorting, hashing, fibonacci, matrix multiply)</li>
-        <li>4x Disk I/O thrash (write/read/hash 20-100MB files)</li>
-        <li>2x Process explosion (up to 20k live processes)</li>
-        <li>2x ETS bloat (50k row inserts, full table scans)</li>
-        <li>4x GC torture (massive garbage + forced collection)</li>
-        <li>4x Binary heap abuse (2-8MB binaries shared across processes)</li>
-        <li>2x Message queue pressure (10k messages flooding slow consumers)</li>
-        <li>2x Port churn (open/pump/close 20-60 ports)</li>
-        <li>Atom growth (500-1000 atoms per batch)</li>
-      </ul>
-      <h3>OTel Pipeline Stress (Tier 4)</h3>
-      <ul>
-        <li>2x Span flood (thousands of micro-spans/sec)</li>
-        <li>2x High cardinality (unique attribute values stress Tempo indexing)</li>
-        <li>Large payloads (spans with massive event data)</li>
-        <li>Metric flood (thousands of telemetry events/sec)</li>
-        <li>Log flood (structured logs flooding Loki)</li>
-      </ul>
-      <h3>Distributed Tracing (Tier 5)</h3>
-      <ul>
-        <li>2x Distributed callers (HTTP calls to worker service on :4003 with W3C traceparent propagation)</li>
-        <li>Worker service endpoints: compute, store, transform — each with nested child spans</li>
-      </ul>
-      <p>Watch it live:</p>
-      <ul>
-        <li><a href="http://localhost:4002/dashboard" target="_blank">Phoenix LiveDashboard</a></li>
-        <li><a href="http://localhost:3404" target="_blank">Grafana (LGTM)</a></li>
-      </ul>
-      <a href="/">Go back</a>
+      <div class="container">
+        <h1>Full Stress Test</h1>
+        <div class="timer-row">
+          <div class="timer-block">
+            <div class="timer-label">Total</div>
+            <div class="timer-value">#{fmt_time(duration)}</div>
+          </div>
+          <div class="timer-block">
+            <div class="timer-label">Remaining</div>
+            <div class="timer-value countdown" id="countdown">#{fmt_time(duration)}</div>
+          </div>
+        </div>
+        <div class="progress-track"><div class="progress-bar" id="progress" style="width: 0%"></div></div>
+        <div class="status" id="status">Running</div>
+        <div class="links">
+          <a href="http://localhost:4002/dashboard" target="_blank">LiveDashboard</a>
+          <a href="http://localhost:3404/d/elixir-stress-test" target="_blank">Grafana: Stress</a>
+          <a href="http://localhost:3404/d/elixir-app-metrics" target="_blank">Grafana: Metrics</a>
+          <a href="/">Back</a>
+        </div>
+      </div>
+      <script>
+        var total = #{duration}, remaining = #{duration};
+        var cd = document.getElementById('countdown');
+        var bar = document.getElementById('progress');
+        var status = document.getElementById('status');
+        function fmt(s) { var m = Math.floor(s/60); var ss = s%60; return (m > 0 ? m + ':' + String(ss).padStart(2,'0') : '' + ss + 's'); }
+        cd.textContent = fmt(remaining);
+        var iv = setInterval(function() {
+          remaining--;
+          if (remaining <= 0) { remaining = 0; clearInterval(iv); status.textContent = 'Complete'; }
+          cd.textContent = fmt(remaining);
+          bar.style.width = (((total - remaining) / total) * 100) + '%';
+        }, 1000);
+      </script>
     </body>
     </html>
     """
@@ -212,27 +278,79 @@ defmodule ElixirStress.Router do
   end
 
   post "/burn" do
+    duration = String.to_integer(conn.body_params["duration"] || "5")
+
     Tracer.with_span "burn.trigger" do
+      cycles = max(div(duration, 3), 1)
       for _ <- 1..10 do
         spawn(fn ->
           list = Enum.to_list(1..500_000)
-          Enum.each(1..20, fn _ -> Enum.sum(list) end)
+          Enum.each(1..cycles, fn _ -> Enum.sum(list) end)
         end)
       end
     end
 
+    burn_total = fmt_time(duration)
+    burn_remaining = fmt_time(duration)
+
     html = """
     <!DOCTYPE html>
     <html>
-    <head><title>Burning!</title></head>
+    <head>
+      <title>Quick Burn</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .container { text-align: center; padding: 40px; }
+        h1 { font-size: 20px; font-weight: 500; color: #b794f4; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 40px; }
+        .timer-row { display: flex; gap: 60px; justify-content: center; align-items: baseline; margin-bottom: 12px; }
+        .timer-block { text-align: center; }
+        .timer-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #666; margin-bottom: 8px; }
+        .timer-value { font-size: 64px; font-weight: 200; font-variant-numeric: tabular-nums; color: #fff; }
+        .timer-value.countdown { color: #b794f4; }
+        .progress-track { width: 300px; height: 2px; background: #1a1a2e; border-radius: 1px; margin: 30px auto; overflow: hidden; }
+        .progress-bar { height: 100%; background: #b794f4; border-radius: 1px; transition: width 1s linear; }
+        .status { font-size: 13px; color: #555; margin-bottom: 40px; }
+        .links { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+        .links a { color: #666; text-decoration: none; font-size: 13px; transition: color 0.2s; }
+        .links a:hover { color: #b794f4; }
+      </style>
+    </head>
     <body>
-      <h1>Busy loop started!</h1>
-      <p>Spawned 10 processes each crunching 500k element lists.</p>
-      <p>
-        <a href="http://localhost:4002/dashboard" target="_blank">Phoenix LiveDashboard</a> |
-        <a href="http://localhost:3404" target="_blank">Grafana</a>
-      </p>
-      <a href="/">Go back</a>
+      <div class="container">
+        <h1>Quick Burn</h1>
+        <div class="timer-row">
+          <div class="timer-block">
+            <div class="timer-label">Total</div>
+            <div class="timer-value">#{burn_total}</div>
+          </div>
+          <div class="timer-block">
+            <div class="timer-label">Remaining</div>
+            <div class="timer-value countdown" id="countdown">#{burn_remaining}</div>
+          </div>
+        </div>
+        <div class="progress-track"><div class="progress-bar" id="progress" style="width: 0%"></div></div>
+        <div class="status" id="status">Running</div>
+        <div class="links">
+          <a href="http://localhost:4002/dashboard" target="_blank">LiveDashboard</a>
+          <a href="http://localhost:3404/d/elixir-stress-test" target="_blank">Grafana: Stress</a>
+          <a href="/">Back</a>
+        </div>
+      </div>
+      <script>
+        var total = #{duration}, remaining = #{duration};
+        var cd = document.getElementById('countdown');
+        var bar = document.getElementById('progress');
+        var status = document.getElementById('status');
+        function fmt(s) { var m = Math.floor(s/60); var ss = s%60; return (m > 0 ? m + ':' + String(ss).padStart(2,'0') : '' + ss + 's'); }
+        cd.textContent = fmt(remaining);
+        var iv = setInterval(function() {
+          remaining--;
+          if (remaining <= 0) { remaining = 0; clearInterval(iv); status.textContent = 'Complete'; }
+          cd.textContent = fmt(remaining);
+          bar.style.width = (((total - remaining) / total) * 100) + '%';
+        }, 1000);
+      </script>
     </body>
     </html>
     """
@@ -245,4 +363,12 @@ defmodule ElixirStress.Router do
   match _ do
     send_resp(conn, 404, "Not found")
   end
+
+  defp fmt_time(seconds) when seconds >= 60 do
+    m = div(seconds, 60)
+    s = rem(seconds, 60)
+    "#{m}:#{String.pad_leading(Integer.to_string(s), 2, "0")}"
+  end
+
+  defp fmt_time(seconds), do: "#{seconds}s"
 end

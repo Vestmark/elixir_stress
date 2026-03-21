@@ -1,6 +1,7 @@
 services:
   lgtm:
     image: grafana/otel-lgtm:latest
+    restart: unless-stopped
     ports:
       - "3404:3000"   # Grafana
       - "4317:4317"   # OTLP gRPC
@@ -12,3 +13,5 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./otel-collector-config.yml:/otel-lgtm/otelcol-config.yaml
+      - ./grafana/provisioning/dashboards/dashboards.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/elixir-dashboards.yaml
+      - ./grafana/dashboards:/etc/grafana/dashboards

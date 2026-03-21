@@ -1,0 +1,610 @@
+{
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "title": "BEAM Resources",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "vm_memory_total",
+          "legendFormat": "Total"
+        },
+        {
+          "expr": "vm_memory_processes",
+          "legendFormat": "Processes"
+        },
+        {
+          "expr": "vm_memory_binary",
+          "legendFormat": "Binary"
+        },
+        {
+          "expr": "vm_memory_ets",
+          "legendFormat": "ETS"
+        },
+        {
+          "expr": "vm_memory_atom",
+          "legendFormat": "Atom"
+        },
+        {
+          "expr": "vm_memory_system",
+          "legendFormat": "System"
+        }
+      ],
+      "title": "Memory Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "vm_total_run_queue_lengths_total",
+          "legendFormat": "Total"
+        },
+        {
+          "expr": "vm_total_run_queue_lengths_cpu",
+          "legendFormat": "CPU"
+        },
+        {
+          "expr": "vm_total_run_queue_lengths_io",
+          "legendFormat": "IO"
+        }
+      ],
+      "title": "Run Queue Lengths (Scheduler Pressure)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 9
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "vm_system_counts_process_count",
+          "legendFormat": "Processes"
+        }
+      ],
+      "title": "Process Count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 9
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "vm_system_counts_port_count",
+          "legendFormat": "Ports"
+        }
+      ],
+      "title": "Port Count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 9
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "vm_system_counts_atom_count",
+          "legendFormat": "Atoms"
+        }
+      ],
+      "title": "Atom Count",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 101,
+      "title": "Worker Activity",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "rate(elixir_stress_worker_cycle_count_total[1m])",
+          "legendFormat": "{{worker}}"
+        }
+      ],
+      "title": "Worker Cycles (rate/s by type)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "rate(elixir_stress_worker_start_count_total[1m])",
+          "legendFormat": "start: {{worker}}"
+        },
+        {
+          "expr": "rate(elixir_stress_worker_stop_count_total[1m])",
+          "legendFormat": "stop: {{worker}}"
+        }
+      ],
+      "title": "Worker Start/Stop Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 25
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "elixir_stress_run_start_count_total",
+          "legendFormat": "Started"
+        },
+        {
+          "expr": "elixir_stress_run_stop_count_total",
+          "legendFormat": "Completed"
+        }
+      ],
+      "title": "Stress Runs",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 18,
+        "x": 6,
+        "y": 25
+      },
+      "id": 9,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "elixir_stress_worker_cycle_value_total",
+          "legendFormat": "{{worker}}"
+        }
+      ],
+      "title": "Worker Cycle Totals",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 102,
+      "title": "Distributed Traces (Tempo)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 10,
+      "targets": [
+        {
+          "limit": 20,
+          "queryType": "nativeSearch",
+          "serviceName": "elixir_stress"
+        }
+      ],
+      "title": "Recent Traces",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "id": 103,
+      "title": "Structured Logs (Loki)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "id": 11,
+      "options": {
+        "enableLogDetails": true,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{service_name=\"elixir_stress\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Application Logs",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 55
+      },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "sum by (severity_text) (count_over_time({service_name=\"elixir_stress\"} [1m]))",
+          "legendFormat": "{{severity_text}}"
+        }
+      ],
+      "title": "Log Volume by Severity",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 55
+      },
+      "id": 13,
+      "options": {
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "expr": "{service_name=\"elixir_stress\", severity_text=\"ERROR\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Logs",
+      "type": "logs"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 63
+      },
+      "id": 104,
+      "title": "OTel Pipeline Stress (Tier 4)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "id": 14,
+      "targets": [
+        {
+          "expr": "rate(elixir_stress_worker_cycle_count_total{worker=~\"span_flood|high_cardinality|large_payloads|metric_flood|log_flood\"}[1m])",
+          "legendFormat": "{{worker}}"
+        }
+      ],
+      "title": "OTel Stress Worker Cycles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 64
+      },
+      "id": 15,
+      "targets": [
+        {
+          "expr": "sum(rate(elixir_stress_otel_metric_flood_count_total[1m]))",
+          "legendFormat": "Total Events/s"
+        },
+        {
+          "expr": "sum by (endpoint) (rate(elixir_stress_otel_metric_flood_count_total[1m]))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "title": "Metric Flood Events/s",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      },
+      "id": 105,
+      "title": "Distributed Tracing (Tier 5)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 73
+      },
+      "id": 16,
+      "targets": [
+        {
+          "expr": "rate(elixir_stress_worker_cycle_count_total{worker=\"distributed_call\"}[1m])",
+          "legendFormat": "distributed_call cycles/s"
+        }
+      ],
+      "title": "Distributed Call Cycles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 73
+      },
+      "id": 17,
+      "options": {
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "expr": "{service_name=\"elixir_stress\"} |= \"worker_service\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Worker Service Logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "5s",
+  "tags": [
+    "elixir",
+    "stress",
+    "otel"
+  ],
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Elixir Stress Test",
+  "uid": "elixir-stress-test"
+}
