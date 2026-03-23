@@ -4,7 +4,25 @@ defmodule ElixirStress.Router do
 
   plug Plug.Parsers, parsers: [:urlencoded]
   plug :match
+  plug :measure_request
   plug :dispatch
+
+  defp measure_request(conn, _opts) do
+    start = System.monotonic_time(:millisecond)
+
+    Plug.Conn.register_before_send(conn, fn conn ->
+      duration = System.monotonic_time(:millisecond) - start
+      path = conn.request_path
+      status = to_string(conn.status)
+
+      :telemetry.execute([:vm, :http, :request], %{duration: duration, count: 1}, %{
+        path: path,
+        status: status
+      })
+
+      conn
+    end)
+  end
 
   get "/" do
     html = """

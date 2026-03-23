@@ -15,6 +15,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: average request/operation latency per service",
@@ -37,7 +38,11 @@
         "targets": [
           {
             "expr": "rate(elixir_stress_app_cycle_duration_duration_sum[1m]) / rate(elixir_stress_app_cycle_duration_duration_count[1m])",
-            "legendFormat": "{{worker}}"
+            "legendFormat": "{{worker}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Avg Cycle Duration by Worker",
@@ -45,6 +50,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: P95 latency per service (histogram_quantile)",
@@ -67,7 +73,11 @@
         "targets": [
           {
             "expr": "histogram_quantile(0.95, sum by (worker, le) (rate(elixir_stress_app_cycle_duration_duration_bucket[1m])))",
-            "legendFormat": "p95 {{worker}}"
+            "legendFormat": "p95 {{worker}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "P95 Cycle Duration by Worker",
@@ -75,6 +85,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: latency distribution heatmap",
@@ -98,7 +109,11 @@
           {
             "expr": "sum by (le) (increase(elixir_stress_app_cycle_duration_duration_bucket[30s]))",
             "format": "heatmap",
-            "legendFormat": "{{le}}"
+            "legendFormat": "{{le}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Cycle Duration Heatmap (All Workers)",
@@ -118,6 +133,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: current resource utilization gauge (e.g. queue depth, cache size)",
@@ -141,7 +157,11 @@
         "targets": [
           {
             "expr": "elixir_stress_app_memory_held_bytes",
-            "legendFormat": "Held Bytes"
+            "legendFormat": "Held Bytes",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Memory Held (Current)",
@@ -149,6 +169,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: items in queue/buffer",
@@ -171,7 +192,11 @@
         "targets": [
           {
             "expr": "elixir_stress_app_memory_held_chunks",
-            "legendFormat": "Chunks Held"
+            "legendFormat": "Chunks Held",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Memory Chunks Held",
@@ -179,6 +204,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: throughput in vs out (e.g. enqueue vs dequeue rate)",
@@ -214,11 +240,19 @@
         "targets": [
           {
             "expr": "rate(elixir_stress_app_memory_allocated_bytes_total[1m])",
-            "legendFormat": "Allocated"
+            "legendFormat": "Allocated",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           },
           {
             "expr": "rate(elixir_stress_app_memory_released_bytes_total[1m])",
-            "legendFormat": "Released"
+            "legendFormat": "Released",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Memory Allocated vs Released (rate/s)",
@@ -226,6 +260,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: total throughput counter",
@@ -256,7 +291,11 @@
         "targets": [
           {
             "expr": "elixir_stress_app_memory_allocated_bytes_total",
-            "legendFormat": "Total Allocated"
+            "legendFormat": "Total Allocated",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Cumulative Memory Allocated",
@@ -276,6 +315,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: write throughput to external storage",
@@ -299,7 +339,11 @@
         "targets": [
           {
             "expr": "rate(elixir_stress_app_disk_written_bytes_total[1m])",
-            "legendFormat": "Write B/s"
+            "legendFormat": "Write B/s",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Disk Write Rate",
@@ -307,6 +351,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: read throughput from external storage",
@@ -330,7 +375,11 @@
         "targets": [
           {
             "expr": "rate(elixir_stress_app_disk_read_bytes_total[1m])",
-            "legendFormat": "Read B/s"
+            "legendFormat": "Read B/s",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Disk Read Rate",
@@ -338,6 +387,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "fieldConfig": {
@@ -367,11 +417,19 @@
         "targets": [
           {
             "expr": "elixir_stress_app_disk_written_bytes_total",
-            "legendFormat": "Written"
+            "legendFormat": "Written",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           },
           {
             "expr": "elixir_stress_app_disk_read_bytes_total",
-            "legendFormat": "Read"
+            "legendFormat": "Read",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Cumulative Disk I/O",
@@ -391,6 +449,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: active connections / workers / goroutines gauge",
@@ -417,7 +476,11 @@
         "targets": [
           {
             "expr": "elixir_stress_app_processes_alive_count",
-            "legendFormat": "Alive"
+            "legendFormat": "Alive",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Processes Alive (Current)",
@@ -425,6 +488,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: connection open vs close rate",
@@ -459,11 +523,19 @@
         "targets": [
           {
             "expr": "rate(elixir_stress_app_processes_spawned_count_total[1m])",
-            "legendFormat": "Spawned"
+            "legendFormat": "Spawned",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           },
           {
             "expr": "rate(elixir_stress_app_processes_killed_count_total[1m])",
-            "legendFormat": "Killed"
+            "legendFormat": "Killed",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Processes Spawned vs Killed (rate/s)",
@@ -471,6 +543,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: message/event throughput",
@@ -494,7 +567,11 @@
         "targets": [
           {
             "expr": "rate(elixir_stress_app_messages_sent_count_total[1m])",
-            "legendFormat": "Messages/s"
+            "legendFormat": "Messages/s",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Messages Sent Rate",
@@ -502,6 +579,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: external resource acquisition/release rate",
@@ -523,11 +601,19 @@
         "targets": [
           {
             "expr": "rate(elixir_stress_app_ports_opened_count_total[1m])",
-            "legendFormat": "Opened/s"
+            "legendFormat": "Opened/s",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           },
           {
             "expr": "rate(elixir_stress_app_ports_closed_count_total[1m])",
-            "legendFormat": "Closed/s"
+            "legendFormat": "Closed/s",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Ports Opened/Closed Rate",
@@ -547,6 +633,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: downstream service latency by endpoint",
@@ -569,7 +656,11 @@
         "targets": [
           {
             "expr": "rate(elixir_stress_app_distributed_call_duration_sum[1m]) / rate(elixir_stress_app_distributed_call_duration_count[1m])",
-            "legendFormat": "{{endpoint}} ({{status}})"
+            "legendFormat": "{{endpoint}} ({{status}})",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Distributed Call Avg Latency by Endpoint",
@@ -577,6 +668,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: P95 downstream latency",
@@ -599,7 +691,11 @@
         "targets": [
           {
             "expr": "histogram_quantile(0.95, sum by (endpoint, le) (rate(elixir_stress_app_distributed_call_duration_bucket[1m])))",
-            "legendFormat": "p95 {{endpoint}}"
+            "legendFormat": "p95 {{endpoint}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Distributed Call P95 Latency",
@@ -607,6 +703,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: request rate per endpoint (RED method - Rate)",
@@ -629,7 +726,11 @@
         "targets": [
           {
             "expr": "sum by (endpoint) (rate(elixir_stress_app_distributed_call_count_total[1m]))",
-            "legendFormat": "{{endpoint}}"
+            "legendFormat": "{{endpoint}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Distributed Call Rate by Endpoint",
@@ -637,6 +738,7 @@
       },
       {
         "datasource": {
+          "type": "prometheus",
           "uid": "prometheus"
         },
         "description": "Template: error rate per endpoint (RED method - Errors)",
@@ -664,7 +766,11 @@
         "targets": [
           {
             "expr": "sum by (endpoint) (rate(elixir_stress_app_distributed_error_count_total[1m]))",
-            "legendFormat": "errors: {{endpoint}}"
+            "legendFormat": "errors: {{endpoint}}",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            }
           }
         ],
         "title": "Distributed Call Errors",
