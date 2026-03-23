@@ -14,6 +14,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -35,27 +36,51 @@
       "targets": [
         {
           "expr": "vm_memory_total",
-          "legendFormat": "Total"
+          "legendFormat": "Total",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "vm_memory_processes",
-          "legendFormat": "Processes"
+          "legendFormat": "Processes",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "vm_memory_binary",
-          "legendFormat": "Binary"
+          "legendFormat": "Binary",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "vm_memory_ets",
-          "legendFormat": "ETS"
+          "legendFormat": "ETS",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "vm_memory_atom",
-          "legendFormat": "Atom"
+          "legendFormat": "Atom",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "vm_memory_system",
-          "legendFormat": "System"
+          "legendFormat": "System",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Memory Usage",
@@ -63,6 +88,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -83,15 +109,27 @@
       "targets": [
         {
           "expr": "vm_total_run_queue_lengths_total",
-          "legendFormat": "Total"
+          "legendFormat": "Total",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "vm_total_run_queue_lengths_cpu",
-          "legendFormat": "CPU"
+          "legendFormat": "CPU",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "vm_total_run_queue_lengths_io",
-          "legendFormat": "IO"
+          "legendFormat": "IO",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Run Queue Lengths (Scheduler Pressure)",
@@ -99,6 +137,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -120,7 +159,11 @@
       "targets": [
         {
           "expr": "vm_system_counts_process_count",
-          "legendFormat": "Processes"
+          "legendFormat": "Processes",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Process Count",
@@ -128,6 +171,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -149,7 +193,11 @@
       "targets": [
         {
           "expr": "vm_system_counts_port_count",
-          "legendFormat": "Ports"
+          "legendFormat": "Ports",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Port Count",
@@ -157,6 +205,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -178,7 +227,11 @@
       "targets": [
         {
           "expr": "vm_system_counts_atom_count",
-          "legendFormat": "Atoms"
+          "legendFormat": "Atoms",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Atom Count",
@@ -198,6 +251,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -218,7 +272,11 @@
       "targets": [
         {
           "expr": "rate(elixir_stress_worker_cycle_count_total[1m])",
-          "legendFormat": "{{worker}}"
+          "legendFormat": "{{worker}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Worker Cycles (rate/s by type)",
@@ -226,6 +284,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -246,11 +305,19 @@
       "targets": [
         {
           "expr": "rate(elixir_stress_worker_start_count_total[1m])",
-          "legendFormat": "start: {{worker}}"
+          "legendFormat": "start: {{worker}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "rate(elixir_stress_worker_stop_count_total[1m])",
-          "legendFormat": "stop: {{worker}}"
+          "legendFormat": "stop: {{worker}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Worker Start/Stop Rate",
@@ -258,6 +325,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -286,11 +354,19 @@
       "targets": [
         {
           "expr": "elixir_stress_run_start_count_total",
-          "legendFormat": "Started"
+          "legendFormat": "Started",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "elixir_stress_run_stop_count_total",
-          "legendFormat": "Completed"
+          "legendFormat": "Completed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Stress Runs",
@@ -298,6 +374,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -322,7 +399,11 @@
       "targets": [
         {
           "expr": "elixir_stress_worker_cycle_value_total",
-          "legendFormat": "{{worker}}"
+          "legendFormat": "{{worker}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Worker Cycle Totals",
@@ -342,6 +423,7 @@
     },
     {
       "datasource": {
+        "type": "tempo",
         "uid": "tempo"
       },
       "gridPos": {
@@ -355,7 +437,11 @@
         {
           "limit": 20,
           "queryType": "nativeSearch",
-          "serviceName": "elixir_stress"
+          "serviceName": "elixir_stress",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          }
         }
       ],
       "title": "Recent Traces",
@@ -375,6 +461,7 @@
     },
     {
       "datasource": {
+        "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
@@ -394,7 +481,11 @@
       "targets": [
         {
           "expr": "{service_name=\"elixir_stress\"}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         }
       ],
       "title": "Application Logs",
@@ -402,6 +493,7 @@
     },
     {
       "datasource": {
+        "type": "loki",
         "uid": "loki"
       },
       "fieldConfig": {
@@ -425,7 +517,11 @@
       "targets": [
         {
           "expr": "sum by (severity_text) (count_over_time({service_name=\"elixir_stress\"} [1m]))",
-          "legendFormat": "{{severity_text}}"
+          "legendFormat": "{{severity_text}}",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         }
       ],
       "title": "Log Volume by Severity",
@@ -433,6 +529,7 @@
     },
     {
       "datasource": {
+        "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
@@ -450,7 +547,11 @@
       "targets": [
         {
           "expr": "{service_name=\"elixir_stress\", severity_text=\"ERROR\"}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         }
       ],
       "title": "Error Logs",
@@ -470,6 +571,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -490,7 +592,11 @@
       "targets": [
         {
           "expr": "rate(elixir_stress_worker_cycle_count_total{worker=~\"span_flood|high_cardinality|large_payloads|metric_flood|log_flood\"}[1m])",
-          "legendFormat": "{{worker}}"
+          "legendFormat": "{{worker}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "OTel Stress Worker Cycles",
@@ -498,6 +604,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -518,11 +625,19 @@
       "targets": [
         {
           "expr": "sum(rate(elixir_stress_otel_metric_flood_count_total[1m]))",
-          "legendFormat": "Total Events/s"
+          "legendFormat": "Total Events/s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "sum by (endpoint) (rate(elixir_stress_otel_metric_flood_count_total[1m]))",
-          "legendFormat": "{{endpoint}}"
+          "legendFormat": "{{endpoint}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Metric Flood Events/s",
@@ -542,6 +657,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
@@ -562,7 +678,11 @@
       "targets": [
         {
           "expr": "rate(elixir_stress_worker_cycle_count_total{worker=\"distributed_call\"}[1m])",
-          "legendFormat": "distributed_call cycles/s"
+          "legendFormat": "distributed_call cycles/s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ],
       "title": "Distributed Call Cycles",
@@ -570,6 +690,7 @@
     },
     {
       "datasource": {
+        "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
@@ -587,11 +708,503 @@
       "targets": [
         {
           "expr": "{service_name=\"elixir_stress\"} |= \"worker_service\"",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         }
       ],
       "title": "Worker Service Logs",
       "type": "logs"
+    },
+    {
+      "type": "row",
+      "title": "BEAM Deep Metrics",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 81
+      },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Scheduler Utilization",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 82
+      },
+      "targets": [
+        {
+          "expr": "vm_scheduler_utilization_weighted",
+          "legendFormat": "Avg %",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "vm_scheduler_utilization_max",
+          "legendFormat": "Max (hottest scheduler) %",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Reductions / sec",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 82
+      },
+      "targets": [
+        {
+          "expr": "vm_reductions_rate",
+          "legendFormat": "reductions/s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Garbage Collection Rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 90
+      },
+      "targets": [
+        {
+          "expr": "vm_gc_count_rate",
+          "legendFormat": "GC runs/s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "vm_gc_words_reclaimed_rate",
+          "legendFormat": "Words reclaimed/s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "System I/O Throughput",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 90
+      },
+      "targets": [
+        {
+          "expr": "vm_io_input_rate_bytes",
+          "legendFormat": "Input bytes/s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "vm_io_output_rate_bytes",
+          "legendFormat": "Output bytes/s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "ETS Tables & Memory",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 98
+      },
+      "targets": [
+        {
+          "expr": "vm_ets_total_memory_bytes",
+          "legendFormat": "ETS total memory",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "ETS Table Count",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 98
+      },
+      "targets": [
+        {
+          "expr": "vm_ets_table_count",
+          "legendFormat": "Tables",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Code & Atom Memory",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 106
+      },
+      "targets": [
+        {
+          "expr": "vm_memory_code_bytes",
+          "legendFormat": "Code (loaded modules)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "vm_memory_atom_used_bytes",
+          "legendFormat": "Atom used",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "vm_memory_atom_bytes",
+          "legendFormat": "Atom reserved",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Request Duration (p95)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 106
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(vm_http_request_duration_milliseconds_bucket[1m])) by (le, path))",
+          "legendFormat": "{{path}} p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Request Rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 114
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(vm_http_request_count[1m])) by (path, status)",
+          "legendFormat": "{{path}} {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
     }
   ],
   "refresh": "5s",
