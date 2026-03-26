@@ -3,17 +3,49 @@ defmodule ElixirStress.OtelLogger do
   Structured logger that sends logs to the OTel collector via OTLP HTTP.
   Enriches every log record with trace_id and span_id from the current OTel context.
   Logs flow: this module -> OTLP HTTP (localhost:4318) -> OTel Collector -> Loki.
+
+  ## OTEL Overview
+  This is the central log output module. All structured logs from stress.ex, otel_stress.ex,
+  and worker_service.ex flow through here.
+
+  ### OTEL Gathering
+  - Reads current OTel span context via `OpenTelemetry.Tracer.current_span_ctx()`
+  - Extracts trace_id and span_id for log-trace correlation
+  - This allows clicking a log entry in Grafana/Loki to jump directly to the correlated trace in Tempo
+
+  ### OTEL Output
+  - Builds OTLP JSON payload (resourceLogs format) with:
+    - Resource attributes: service.name="elixir_stress", service.instance.id, host.name
+    - Scope: "elixir_stress.logger" v0.1.0
+    - Per-record: timeUnixNano, severityNumber/Text, body, attributes, traceId, spanId
+  - Sends via HTTP POST to localhost:4318/v1/logs (OTLP HTTP endpoint)
+  - Flow: OtelLogger → OTLP HTTP → OTel Collector → Loki
+  - **Grafana locations:**
+    - "Elixir Stress Test" dashboard → "Structured Logs" → "Application Logs" (all logs)
+    - "Elixir Stress Test" dashboard → "Structured Logs" → "Log Volume by Severity" (stacked by level)
+    - "Elixir Stress Test" dashboard → "Structured Logs" → "Error Logs" (ERROR only)
+    - "Elixir Stress Test" dashboard → "Distributed Tracing" → "Worker Service Logs"
+    - Grafana Explore → Loki → {service_name="elixir_stress"}
+    - Each log entry has trace_id link → click to jump to Tempo trace
   """
 
   use GenServer
 
   @flush_interval 1_000
+  ## OTEL Output: OTLP HTTP endpoint for log export
+  ##   Logs are POSTed here as JSON every @flush_interval (1 second)
+  ##   → OTel Collector → Loki → Grafana
   @otlp_endpoint ~c"http://localhost:4318/v1/logs"
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  ## OTEL Gathering: Captures trace_id and span_id from the CURRENT OTel span context
+  ##   at the moment the log is created (not when it's flushed). This ensures correct
+  ##   correlation even though logs are buffered and sent asynchronously.
+  ##   trace_id: 32-char hex string (128-bit), span_id: 16-char hex string (64-bit)
+  ##   These are included in the OTLP log payload for log-trace correlation in Grafana
   def log(level, message, metadata \\ %{}) do
     span_ctx = OpenTelemetry.Tracer.current_span_ctx()
 
@@ -76,6 +108,10 @@ defmodule ElixirStress.OtelLogger do
     Process.send_after(self(), :flush, @flush_interval)
   end
 
+  ## OTEL Output: Sends buffered log records as OTLP JSON to the OTel Collector
+  ##   HTTP POST to localhost:4318/v1/logs with Content-Type: application/json
+  ##   → OTel Collector logs pipeline → Loki
+  ##   → Grafana: "Elixir Stress Test" → "Structured Logs" section (all panels)
   defp send_logs(records) do
     payload = build_otlp_payload(records)
     body = Jason.encode!(payload)
@@ -91,6 +127,10 @@ defmodule ElixirStress.OtelLogger do
     _ -> :ok
   end
 
+  ## OTEL Output: Builds OTLP resourceLogs JSON payload
+  ##   Structure: { resourceLogs: [{ resource: { attributes: [...] }, scopeLogs: [{ scope: {...}, logRecords: [...] }] }] }
+  ##   Resource attributes identify the service: service.name, service.instance.id, host.name
+  ##   Each logRecord includes: timeUnixNano, severityNumber/Text, body, attributes, traceId, spanId
   defp build_otlp_payload(records) do
     %{
       "resourceLogs" => [

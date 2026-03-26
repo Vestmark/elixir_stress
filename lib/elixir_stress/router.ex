@@ -1,4 +1,14 @@
 defmodule ElixirStress.Router do
+  @moduledoc """
+  Main web routes on port 4001. Serves the control panel UI, Prometheus metrics endpoint,
+  and stress test trigger endpoints.
+
+  ## OTEL Output
+  - HTTP request telemetry via measure_request plug
+  - Stress test trigger spans and telemetry events
+  - Prometheus /metrics scrape endpoint
+  """
+
   use Plug.Router
   require OpenTelemetry.Tracer, as: Tracer
 
@@ -7,6 +17,11 @@ defmodule ElixirStress.Router do
   plug :measure_request
   plug :dispatch
 
+  ## OTEL Gathering: Measures HTTP request duration for every request to this router
+  ## OTEL Output: Telemetry event [:vm, :http, :request] with {duration, count} + {path, status} metadata
+  ##   → Prometheus: vm_http_request_duration (histogram), vm_http_request_count (counter)
+  ##   → OTel Collector scrape → Mimir
+  ##   → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "HTTP Request Duration p95" + "HTTP Request Rate"
   defp measure_request(conn, _opts) do
     start = System.monotonic_time(:millisecond)
 
@@ -210,6 +225,10 @@ defmodule ElixirStress.Router do
     |> send_resp(200, html)
   end
 
+  ## OTEL Output: Prometheus metrics scrape endpoint
+  ##   Returns all metrics in Prometheus text format
+  ##   OTel Collector scrapes this every 5s (configured in otel-collector-config.yml, target: host.docker.internal:4001)
+  ##   → OTel Collector → Mimir → Grafana: all metric panels across both dashboards
   get "/metrics" do
     metrics = ElixirStress.PromMetrics.scrape()
 
@@ -221,6 +240,10 @@ defmodule ElixirStress.Router do
   post "/stress" do
     duration = String.to_integer(conn.body_params["duration"] || "30")
 
+    ## OTEL Output: Creates "stress_test.trigger" span with duration attribute → Tempo
+    ##   → Grafana: "Elixir Stress Test" → "Distributed Traces" → visible as trigger span
+    ## OTEL Output: Telemetry event [:elixir_stress, :run, :start] → Prometheus counter
+    ##   → Mimir → Grafana: "Elixir Stress Test" → "Worker Activity" → "Stress Runs"
     Tracer.with_span "stress_test.trigger", attributes: %{duration: duration} do
       :telemetry.execute([:elixir_stress, :run, :start], %{}, %{duration: duration})
       spawn(fn -> ElixirStress.Stress.run(duration) end)

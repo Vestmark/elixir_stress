@@ -4,6 +4,23 @@ defmodule ElixirStress.OtelStress do
   These generate massive volumes of spans, high-cardinality attributes,
   large payloads, and metric floods to test collector backpressure,
   Tempo ingestion, and Mimir write throughput.
+
+  ## OTEL Overview
+  This module intentionally generates extreme volumes of OTel data to stress-test the pipeline:
+  - Thousands of spans/sec → tests OTLP batch processor + Tempo ingestion
+  - High-cardinality attributes → tests Tempo indexing
+  - Large span payloads → tests OTLP exporter throughput
+  - Metric floods → tests Prometheus scrape + Mimir writes
+  - Log floods → tests OTLP HTTP log export + Loki ingestion
+
+  ### OTEL Output Destinations
+  - **Spans** → OTLP gRPC (:4317) → OTel Collector → Tempo
+    - Grafana: "Elixir Stress Test" → "OTel Pipeline Stress" → "OTel Stress Worker Cycles"
+    - Grafana: Explore → Tempo → service_name="elixir_stress"
+  - **Metrics** → :telemetry events → Prometheus /metrics → OTel Collector scrape → Mimir
+    - Grafana: "Elixir Stress Test" → "OTel Pipeline Stress" → "Metric Flood Events/s"
+  - **Logs** → OtelLogger → OTLP HTTP (:4318/v1/logs) → OTel Collector → Loki
+    - Grafana: "Elixir Stress Test" → "Structured Logs" → "Application Logs"
   """
 
   require OpenTelemetry.Tracer, as: Tracer
@@ -11,8 +28,16 @@ defmodule ElixirStress.OtelStress do
 
   # --- Span Flood: thousands of micro-spans per second ---
 
+  ## OTEL Output: Creates thousands of micro-spans per second to stress Tempo ingestion
+  ##   - Parent span: "otel_stress.span_flood"
+  ##   - Per-batch: "flood.micro_span" with nested "flood.inner" child spans
+  ##   - Each micro_span has: batch_seq, total_seq, timestamp attributes + "tick" event
+  ##   → OTLP gRPC → OTel Collector → Tempo
+  ##   → Grafana: "Elixir Stress Test" → "OTel Pipeline Stress" → "OTel Stress Worker Cycles"
+  ##   → Grafana: Explore → Tempo → hundreds of span_flood traces visible
   def span_flood(seconds) do
     Tracer.with_span "otel_stress.span_flood", attributes: %{duration_seconds: seconds} do
+      ## OTEL Output: Log → Loki → Grafana: "Application Logs"
       OtelLogger.info("OTel stress: span flood starting", %{worker: "span_flood"})
       deadline = deadline(seconds)
       span_flood_loop(deadline, 0)
@@ -32,6 +57,8 @@ defmodule ElixirStress.OtelStress do
 
       new =
         Enum.reduce(1..batch_size, 0, fn i, acc ->
+          ## OTEL Output: Creates "flood.micro_span" with unique attributes per span
+          ##   → Tempo: each span appears in trace waterfall with batch_seq, total_seq, timestamp
           Tracer.with_span "flood.micro_span",
             attributes: %{
               batch_seq: i,
@@ -40,6 +67,7 @@ defmodule ElixirStress.OtelStress do
             } do
             Tracer.add_event("tick", %{value: :rand.uniform(1000)})
 
+            ## OTEL Output: Nested child span "flood.inner" → deeper trace tree
             Tracer.with_span "flood.inner" do
               :erlang.phash2(:rand.uniform(1_000_000))
             end
@@ -55,6 +83,13 @@ defmodule ElixirStress.OtelStress do
 
   # --- High Cardinality: unique attribute values to stress indexing ---
 
+  ## OTEL Output: Creates spans with unique attribute values every time → stresses Tempo indexing
+  ##   - Parent span: "otel_stress.high_cardinality"
+  ##   - Per batch of 50: "cardinality.operation" spans with unique_request_id, user_id, session_id,
+  ##     request_path, http_method, status_code, region, version, correlation_id
+  ##   - Each span has "request_processed" event with duration_ms, bytes_in, bytes_out, cache_hit
+  ##   → OTLP gRPC → OTel Collector → Tempo (high-cardinality label indexing stress)
+  ##   → Grafana: "Elixir Stress Test" → "OTel Pipeline Stress" → "OTel Stress Worker Cycles"
   def high_cardinality(seconds) do
     Tracer.with_span "otel_stress.high_cardinality", attributes: %{duration_seconds: seconds} do
       OtelLogger.info("OTel stress: high cardinality starting", %{worker: "high_cardinality"})
@@ -103,6 +138,13 @@ defmodule ElixirStress.OtelStress do
 
   # --- Large Payloads: spans with massive event data ---
 
+  ## OTEL Output: Creates spans with very large event payloads → stresses OTLP exporter throughput
+  ##   - Parent span: "otel_stress.large_payloads"
+  ##   - Per batch of 10: "payload.heavy_span" with payload_id, data_classification attributes
+  ##   - Events: "large_request_body" (~4KB body_preview + 50 headers + 30 query params),
+  ##     "large_response_body" (~4KB response preview + sizes), "stack_trace" (20-frame trace)
+  ##   → OTLP gRPC → OTel Collector → Tempo (large payload serialization stress)
+  ##   → Grafana: "Elixir Stress Test" → "OTel Pipeline Stress" → "OTel Stress Worker Cycles"
   def large_payloads(seconds) do
     Tracer.with_span "otel_stress.large_payloads", attributes: %{duration_seconds: seconds} do
       OtelLogger.info("OTel stress: large payloads starting", %{worker: "large_payloads"})
@@ -160,6 +202,13 @@ defmodule ElixirStress.OtelStress do
 
   # --- Metric Flood: emit thousands of telemetry events per second ---
 
+  ## OTEL Output: Emits 500 telemetry events per batch to stress Prometheus scrape + Mimir writes
+  ##   - Parent span: "otel_stress.metric_flood"
+  ##   - Telemetry event: [:elixir_stress, :otel, :metric_flood] with value, latency, size measurements
+  ##     and endpoint (/api/users, /api/orders, etc.) + method (GET/POST/PUT/DELETE) metadata
+  ##   → Prometheus metrics: elixir_stress_otel_metric_flood_count, elixir_stress_otel_metric_flood_value
+  ##   → OTel Collector scrape → Mimir
+  ##   → Grafana: "Elixir Stress Test" → "OTel Pipeline Stress" → "Metric Flood Events/s"
   def metric_flood(seconds) do
     Tracer.with_span "otel_stress.metric_flood", attributes: %{duration_seconds: seconds} do
       OtelLogger.info("OTel stress: metric flood starting", %{worker: "metric_flood"})
@@ -202,6 +251,13 @@ defmodule ElixirStress.OtelStress do
 
   # --- Log Flood: stress the Loki pipeline ---
 
+  ## OTEL Output: Sends 100 structured logs per batch at all severity levels → stresses Loki ingestion
+  ##   - Parent span: "otel_stress.log_flood"
+  ##   - Each log: random level (debug/info/warning/error), message with payload, metadata with
+  ##     worker, sequence, level, random_value, module, action
+  ##   - Logs include trace_id/span_id for correlation (gathered from current OTel context)
+  ##   → OtelLogger → OTLP HTTP (:4318/v1/logs) → OTel Collector → Loki
+  ##   → Grafana: "Elixir Stress Test" → "Structured Logs" → "Application Logs" + "Log Volume by Severity"
   def log_flood(seconds) do
     Tracer.with_span "otel_stress.log_flood", attributes: %{duration_seconds: seconds} do
       OtelLogger.info("OTel stress: log flood starting", %{worker: "log_flood"})
@@ -240,6 +296,9 @@ defmodule ElixirStress.OtelStress do
     end
   end
 
+  ## OTEL Output: Telemetry event [:elixir_stress, :worker, :cycle] → Prometheus counter + sum
+  ##   → Mimir → Grafana: "Elixir Stress Test" → "Worker Activity" → "Worker Cycles (rate/s)"
+  ##   and → "OTel Pipeline Stress" → "OTel Stress Worker Cycles"
   defp emit_cycle(worker_name) do
     :telemetry.execute([:elixir_stress, :worker, :cycle], %{count: 1, value: 1}, %{
       worker: Atom.to_string(worker_name)

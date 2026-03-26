@@ -3,6 +3,23 @@ defmodule ElixirStress.WorkerService do
   Tier 5: A second HTTP service (port 4003) that simulates a downstream microservice.
   The main stress test makes HTTP calls here with W3C traceparent headers,
   creating real distributed traces across service boundaries.
+
+  ## OTEL Overview
+  This module receives distributed trace context from the main stress test and creates
+  child spans that appear in the same trace waterfall in Grafana/Tempo.
+
+  ### OTEL Gathering (inputs)
+  - W3C traceparent headers extracted from incoming HTTP requests via `:otel_propagator_text_map.extract/1`
+  - This links worker service spans to the parent "distributed.http_call" span in stress.ex
+
+  ### OTEL Output (destinations)
+  - **Traces** → OTLP gRPC (:4317) → OTel Collector → Tempo
+    - Grafana: "Elixir Stress Test" → "Distributed Traces" → click any distributed_call trace
+    - Grafana: Explore → Tempo → traces show both "elixir_stress" and "worker_service" spans
+    - Grafana: "Elixir Stress Test" → "Distributed Tracing" → "Distributed Call Cycles"
+  - **Logs** → OtelLogger → OTLP HTTP (:4318/v1/logs) → OTel Collector → Loki
+    - Grafana: "Elixir Stress Test" → "Distributed Tracing" → "Worker Service Logs"
+    - Grafana: "Elixir Stress Test" → "Structured Logs" → "Application Logs"
   """
 
   use Plug.Router
@@ -13,7 +30,19 @@ defmodule ElixirStress.WorkerService do
   plug :match
   plug :dispatch
 
+  ## ========================================================================
+  ## /work/compute — CPU-intensive operations with nested child spans
+  ## ========================================================================
+  ## OTEL Output:
+  ##   - Parent span: "worker_service.compute" with service.name + operation attributes
+  ##   - Child spans: "compute.fibonacci" (fib_n, fib_result, fibonacci_complete event),
+  ##     "compute.sort" (sort_complete event with element count),
+  ##     "compute.hash" (hash_complete event with rounds + hash_prefix)
+  ##   → Tempo → Grafana: trace waterfall shows compute sub-operations
+  ##   - Logs: "compute request received" + "compute complete" → Loki
   post "/work/compute" do
+    ## OTEL Gathering: Extracts W3C traceparent from request headers → sets current span context
+    ##   This makes all spans in this request children of the caller's "distributed.http_call" span
     extract_context(conn)
 
     Tracer.with_span "worker_service.compute",
@@ -49,7 +78,18 @@ defmodule ElixirStress.WorkerService do
     end
   end
 
+  ## ========================================================================
+  ## /work/store — ETS operations with nested child spans
+  ## ========================================================================
+  ## OTEL Output:
+  ##   - Parent span: "worker_service.store" with service.name + operation attributes
+  ##   - Child spans: "store.insert" (row_count attr, rows_inserted event),
+  ##     "store.scan" (scan_complete event with total_bytes),
+  ##     "store.cleanup" (table_deleted event)
+  ##   → Tempo → Grafana: trace waterfall shows store sub-operations
+  ##   - Logs: "store request received" + "store complete" → Loki
   post "/work/store" do
+    ## OTEL Gathering: Extracts W3C traceparent from inbound request headers
     extract_context(conn)
 
     Tracer.with_span "worker_service.store",
@@ -82,7 +122,18 @@ defmodule ElixirStress.WorkerService do
     end
   end
 
+  ## ========================================================================
+  ## /work/transform — Data processing with deeply nested child spans
+  ## ========================================================================
+  ## OTEL Output:
+  ##   - Parent span: "worker_service.transform" with service.name + operation attributes
+  ##   - Child spans (nested 3 deep): "transform.generate" (data_generated event with count),
+  ##     → "transform.filter" (data_filtered event with kept count),
+  ##       → "transform.aggregate" (aggregation_complete event with bucket count)
+  ##   → Tempo → Grafana: trace waterfall shows nested transform pipeline
+  ##   - Logs: "transform request received" + "transform complete" → Loki
   post "/work/transform" do
+    ## OTEL Gathering: Extracts W3C traceparent from inbound request headers
     extract_context(conn)
 
     Tracer.with_span "worker_service.transform",
@@ -119,6 +170,11 @@ defmodule ElixirStress.WorkerService do
     send_resp(conn, 404, "Not found")
   end
 
+  ## OTEL Gathering: Extracts W3C traceparent + tracestate from incoming HTTP request headers
+  ##   Uses :otel_propagator_text_map.extract/1 which reads "traceparent" header
+  ##   Format: "00-<32-hex-trace-id>-<16-hex-span-id>-<2-hex-flags>"
+  ##   After extraction, all Tracer.with_span calls in this request become children of the
+  ##   caller's span, creating a cross-service distributed trace in Tempo
   defp extract_context(conn) do
     headers =
       Enum.map(conn.req_headers, fn {k, v} -> {k, v} end)

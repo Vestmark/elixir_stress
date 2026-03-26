@@ -1,5 +1,27 @@
 defmodule ElixirStress.Stress do
-  @moduledoc false
+  @moduledoc """
+  Main stress test suite with deep OpenTelemetry tracing.
+
+  ## OTEL Overview
+  This module is the primary source of OTel spans, span events, span attributes,
+  telemetry events (for Prometheus metrics), and structured logs (via OtelLogger → Loki).
+
+  ### OTEL Gathering (inputs)
+  - Span context propagation via `OpenTelemetry.Ctx.get_current/0` and `OpenTelemetry.Ctx.attach/1`
+  - W3C traceparent extraction via `:otel_propagator_text_map.inject/1` for distributed calls
+
+  ### OTEL Output (destinations)
+  - **Traces** → OTLP gRPC (:4317) → OTel Collector → Tempo
+    - Grafana: "Elixir Stress Test" dashboard → "Distributed Traces" section → "Recent Traces" table
+    - Grafana: Explore → Tempo datasource → service_name="elixir_stress"
+  - **Metrics** → :telemetry events → TelemetryMetricsPrometheus.Core → /metrics → OTel Collector scrape → Mimir
+    - Grafana: "Elixir Stress Test" dashboard → "Worker Activity" section (cycles, start/stop rates)
+    - Grafana: "Elixir Stress - Application Metrics" dashboard (cycle durations, memory, disk, processes, etc.)
+  - **Logs** → OtelLogger → OTLP HTTP (:4318/v1/logs) → OTel Collector → Loki
+    - Grafana: "Elixir Stress Test" dashboard → "Structured Logs" section → "Application Logs"
+    - Grafana: Explore → Loki datasource → {service_name="elixir_stress"}
+  """
+
   require OpenTelemetry.Tracer, as: Tracer
   alias ElixirStress.OtelLogger
   alias ElixirStress.OtelStress
@@ -8,12 +30,17 @@ defmodule ElixirStress.Stress do
   @worker_service "http://localhost:4003"
 
   def run(duration_seconds \\ 30) do
+    ## OTEL Gathering: Captures parent span context for the entire stress test run
+    ## OTEL Output: Creates root span "stress_test.run" with duration, scheduler count, and node attributes
+    ##   → Tempo via OTLP gRPC → Grafana: "Elixir Stress Test" → "Distributed Traces" → "Recent Traces"
     Tracer.with_span "stress_test.run",
       attributes: %{
         duration_seconds: duration_seconds,
         schedulers: System.schedulers_online(),
         node: node() |> Atom.to_string()
       } do
+      ## OTEL Output: Structured log "Stress test starting" with duration + scheduler metadata
+      ##   → OtelLogger → OTLP HTTP → Loki → Grafana: "Elixir Stress Test" → "Application Logs"
       OtelLogger.info("Stress test starting", %{
         duration: duration_seconds,
         schedulers: System.schedulers_online()
@@ -31,6 +58,8 @@ defmodule ElixirStress.Stress do
           write_concurrency: true
         ])
 
+      ## OTEL Gathering: Captures current span context to propagate to all child worker tasks
+      ##   Workers run in separate processes; without this, they'd lose the parent span context
       run_ctx = OpenTelemetry.Ctx.get_current()
 
       workers =
@@ -79,16 +108,23 @@ defmodule ElixirStress.Stress do
       duration_ns = System.monotonic_time() - start_time
       duration_ms = System.convert_time_unit(duration_ns, :native, :millisecond)
 
+      ## OTEL Output: Telemetry event [:elixir_stress, :run, :stop] with duration measurement
+      ##   → Prometheus metric: elixir_stress_run_stop_count, elixir_stress_run_stop_duration
+      ##   → OTel Collector scrape → Mimir → Grafana: "Elixir Stress Test" → "Worker Activity" → "Stress Runs"
       :telemetry.execute([:elixir_stress, :run, :stop], %{duration: duration_ns}, %{
         duration_seconds: duration_seconds
       })
 
+      ## OTEL Output: Structured log "Stress test complete" with duration and worker count
+      ##   → OtelLogger → OTLP HTTP → Loki → Grafana: "Elixir Stress Test" → "Application Logs"
       OtelLogger.info("Stress test complete", %{
         duration_seconds: duration_seconds,
         actual_duration_ms: duration_ms,
         worker_count: length(workers)
       })
 
+      ## OTEL Output: Sets final attributes on root "stress_test.run" span
+      ##   → Tempo → Grafana: visible when clicking trace in "Recent Traces" table
       Tracer.set_attributes(%{
         actual_duration_ms: duration_ms,
         worker_count: length(workers)
@@ -106,14 +142,21 @@ defmodule ElixirStress.Stress do
   defp replicate(n, fun), do: for(_ <- 1..n, do: Task.async(fun))
 
   defp propagated_worker(ctx, worker_name, duration_seconds) do
+    ## OTEL Gathering: Attaches parent span context from the main run to this worker's process
+    ##   Without this, the worker span would be orphaned (no parent) since it runs in a separate Task
     OpenTelemetry.Ctx.attach(ctx)
 
+    ## OTEL Output: Creates child span "stress.worker.<name>" under "stress_test.run"
+    ##   → Tempo → Grafana: "Elixir Stress Test" → "Distributed Traces" → click trace → waterfall view
     Tracer.with_span "stress.worker.#{worker_name}",
       attributes: %{worker: Atom.to_string(worker_name)} do
+      ## OTEL Output: Telemetry event [:elixir_stress, :worker, :start] → Prometheus counter
+      ##   → Mimir → Grafana: "Elixir Stress Test" → "Worker Activity" → "Worker Start/Stop Rate"
       :telemetry.execute([:elixir_stress, :worker, :start], %{count: 1}, %{
         worker: Atom.to_string(worker_name)
       })
 
+      ## OTEL Output: Log "Worker started" → Loki → Grafana: "Elixir Stress Test" → "Application Logs"
       OtelLogger.info("Worker started: #{worker_name}", %{worker: Atom.to_string(worker_name)})
 
       result =
@@ -121,14 +164,19 @@ defmodule ElixirStress.Stress do
           apply(__MODULE__, :"do_#{worker_name}", [duration_seconds])
         rescue
           e ->
+            ## OTEL Output: Records exception on current span with full stacktrace
+            ##   → Tempo → Grafana: trace waterfall shows error icon + exception details
             OpenTelemetry.Span.record_exception(
               Tracer.current_span_ctx(),
               e,
               __STACKTRACE__
             )
 
+            ## OTEL Output: Sets span status to :error with exception message
+            ##   → Tempo → Grafana: trace waterfall shows red error status
             Tracer.set_status(:error, Exception.message(e))
 
+            ## OTEL Output: Error log → Loki → Grafana: "Elixir Stress Test" → "Error Logs"
             OtelLogger.error("Worker #{worker_name} crashed: #{Exception.message(e)}", %{
               worker: Atom.to_string(worker_name),
               error: Exception.message(e)
@@ -137,15 +185,20 @@ defmodule ElixirStress.Stress do
             {:error, worker_name, Exception.message(e)}
         end
 
+      ## OTEL Output: Telemetry event [:elixir_stress, :worker, :stop] → Prometheus counter
+      ##   → Mimir → Grafana: "Elixir Stress Test" → "Worker Activity" → "Worker Start/Stop Rate"
       :telemetry.execute([:elixir_stress, :worker, :stop], %{count: 1}, %{
         worker: Atom.to_string(worker_name)
       })
 
+      ## OTEL Output: Log "Worker stopped" → Loki → Grafana: "Application Logs"
       OtelLogger.info("Worker stopped: #{worker_name}", %{worker: Atom.to_string(worker_name)})
       result
     end
   end
 
+  ## Same as propagated_worker/3 but passes an extra argument (used by ets_bloat for shared table)
+  ## OTEL Output: Same span/telemetry/log pattern as propagated_worker/3 above
   defp propagated_worker_with_arg(ctx, worker_name, duration_seconds, arg) do
     OpenTelemetry.Ctx.attach(ctx)
 
@@ -162,18 +215,11 @@ defmodule ElixirStress.Stress do
           apply(__MODULE__, :"do_#{worker_name}", [duration_seconds, arg])
         rescue
           e ->
-            OpenTelemetry.Span.record_exception(
-              Tracer.current_span_ctx(),
-              e,
-              __STACKTRACE__
-            )
-
+            OpenTelemetry.Span.record_exception(Tracer.current_span_ctx(), e, __STACKTRACE__)
             Tracer.set_status(:error, Exception.message(e))
-
             OtelLogger.error("Worker #{worker_name} crashed: #{Exception.message(e)}", %{
               worker: Atom.to_string(worker_name)
             })
-
             {:error, worker_name, Exception.message(e)}
         end
 
@@ -185,6 +231,9 @@ defmodule ElixirStress.Stress do
     end
   end
 
+  ## Propagates OTel context to Tier 4 OTel stress workers (span_flood, high_cardinality, etc.)
+  ## OTEL Gathering: Attaches parent context so OtelStress spans nest under "stress_test.run"
+  ## OTEL Output: Worker start/stop telemetry events → same Prometheus metrics as regular workers
   defp propagated_otel_worker(ctx, worker_name, duration_seconds) do
     OpenTelemetry.Ctx.attach(ctx)
 
@@ -211,16 +260,26 @@ defmodule ElixirStress.Stress do
     result
   end
 
+  ## OTEL Output: Telemetry event [:elixir_stress, :worker, :cycle] → Prometheus counter + sum
+  ##   → Mimir → Grafana: "Elixir Stress Test" → "Worker Activity" → "Worker Cycles (rate/s)" and "Worker Cycle Totals"
   defp emit_cycle(worker_name) do
     :telemetry.execute([:elixir_stress, :worker, :cycle], %{count: 1, value: 1}, %{
       worker: Atom.to_string(worker_name)
     })
   end
 
+  ## OTEL Output: Telemetry event [:elixir_stress, :app, <event...>] → Prometheus metrics (various types)
+  ##   → Mimir → Grafana: "Elixir Stress - Application Metrics" dashboard (varies by event)
+  ##   Events include: [:memory, :allocated], [:memory, :released], [:memory, :held],
+  ##   [:disk, :written], [:disk, :read], [:processes, :spawned], [:processes, :killed],
+  ##   [:processes, :alive], [:messages, :sent], [:ports, :opened], [:ports, :closed],
+  ##   [:distributed, :call], [:distributed, :error], [:cycle_duration]
   defp emit_app(event, measurements, metadata) do
     :telemetry.execute([:elixir_stress, :app | event], measurements, metadata)
   end
 
+  ## OTEL Output: Measures cycle duration in microseconds → Prometheus distribution
+  ##   → Mimir → Grafana: "App Metrics" → "Cycle Duration by Worker" histogram
   defp timed_cycle(worker_name, fun) do
     start = System.monotonic_time(:microsecond)
     result = fun.()
@@ -232,6 +291,16 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # MEMORY HOG
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "memory_hog.cycle" with cycle number and chunks_held → Tempo
+  ##   - Span events: "allocate_list", "allocate_binary", "allocate_map", "allocate_nested", "memory_drop"
+  ##   - Telemetry: [:elixir_stress, :app, :memory, :allocated] (bytes + count) → Mimir
+  ##     → Grafana: "App Metrics" → "Memory Operations" → "Bytes Allocated" and "Allocation Count"
+  ##   - Telemetry: [:elixir_stress, :app, :memory, :released] (bytes) → Mimir
+  ##     → Grafana: "App Metrics" → "Memory Operations" → "Bytes Released"
+  ##   - Telemetry: [:elixir_stress, :app, :memory, :held] (bytes + chunks gauge) → Mimir
+  ##     → Grafana: "App Metrics" → "Memory Operations" → "Currently Held Bytes/Chunks"
+  ##   - Log every 5 cycles: "memory_hog: cycle N, holding XMB" → Loki → Grafana: "Application Logs"
   def do_memory_hog(seconds) do
     deadline = deadline(seconds)
     memory_hog_loop(deadline, [], 0)
@@ -328,6 +397,12 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # CPU SATURATE
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "cpu_saturate.cycle" with algorithm attribute → Tempo
+  ##   - Span events: "computation_start", "computation_complete" with algorithm name
+  ##   - Span attributes: algorithm name (fibonacci/sort_and_chunk/sha256_chain/matrix_multiply/ackermann/permutations)
+  ##   → Grafana: "Elixir Stress Test" → trace waterfall shows CPU algorithm selection per cycle
+  ##   → Grafana: "Elixir Stress Test" → "BEAM Resources" → "Run Queue Lengths" (indirect: CPU pressure visible)
   def do_cpu_saturate(seconds) do
     deadline = deadline(seconds)
     cpu_saturate_loop(deadline, 0)
@@ -415,6 +490,14 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # DISK THRASH
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "disk_thrash.cycle" → Tempo
+  ##   - Child spans: "disk.write" (with path + bytes), "disk.read_and_hash"
+  ##   - Span events: "file_written", "file_read_and_hashed", "file_read_failed", "file_deleted"
+  ##   - Telemetry: [:elixir_stress, :app, :disk, :written] (bytes + count) → Mimir
+  ##     → Grafana: "App Metrics" → "Disk I/O" → "Bytes Written" and "Write Operations"
+  ##   - Telemetry: [:elixir_stress, :app, :disk, :read] (bytes + count) → Mimir
+  ##     → Grafana: "App Metrics" → "Disk I/O" → "Bytes Read" and "Read Operations"
   def do_disk_thrash(seconds) do
     deadline = deadline(seconds)
     disk_thrash_loop(deadline, 0)
@@ -475,6 +558,16 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # PROCESS EXPLOSION
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "process_explosion.cycle" with alive_before count → Tempo
+  ##   - Span events: "processes_spawned" (count), "processes_culled" (killed + remaining)
+  ##   - Telemetry: [:elixir_stress, :app, :processes, :spawned] (count) → Mimir
+  ##     → Grafana: "App Metrics" → "Process Churn" → "Processes Spawned"
+  ##   - Telemetry: [:elixir_stress, :app, :processes, :killed] (count) → Mimir
+  ##     → Grafana: "App Metrics" → "Process Churn" → "Processes Killed"
+  ##   - Telemetry: [:elixir_stress, :app, :processes, :alive] (count gauge) → Mimir
+  ##     → Grafana: "App Metrics" → "Process Churn" → "Currently Alive Processes"
+  ##   Also visible in: "Elixir Stress Test" → "BEAM Resources" → "Process / Port / Atom Counts"
   def do_process_explosion(seconds) do
     deadline = deadline(seconds)
     explosion_loop(deadline, [], 0)
@@ -527,6 +620,11 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # ETS BLOAT
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "ets_bloat.cycle" with operation name (bulk_insert/full_scan/select_all/clear_and_refill/concurrent_write)
+  ##   - Span events: "rows_inserted", "table_scanned", "select_complete", "table_cleared_and_refilled", "concurrent_writes"
+  ##   → Tempo → Grafana: trace waterfall shows ETS operation details
+  ##   Also visible in: "Elixir Stress Test" → "BEAM Deep Metrics" → "ETS Tables & Memory" and "ETS Table Count"
   def do_ets_bloat(seconds, shared) do
     deadline = deadline(seconds)
 
@@ -607,6 +705,12 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # GC TORTURE
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "gc_torture.cycle" → Tempo
+  ##   - Child spans: "gc.allocate_garbage", "gc.more_garbage", "gc.sub_processes"
+  ##   - Span events: "garbage_allocated", "gc_forced" (phase 1 & 2), "more_garbage_allocated", "sub_processes_complete"
+  ##   → Tempo → Grafana: trace waterfall shows GC allocation/collection phases
+  ##   Also visible in: "Elixir Stress Test" → "BEAM Deep Metrics" → "GC Rate" (count_rate, words_reclaimed_rate)
   def do_gc_torture(seconds) do
     deadline = deadline(seconds)
     gc_torture_loop(deadline, 0)
@@ -673,6 +777,12 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # BINARY ABUSE
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "binary_abuse.cycle" with held_before count → Tempo
+  ##   - Span events: "binaries_allocated" (count + total_bytes), "binaries_trimmed" (from/to counts)
+  ##   - Span attributes: held_after count
+  ##   → Tempo → Grafana: trace waterfall shows binary allocation patterns
+  ##   Also visible in: "Elixir Stress Test" → "BEAM Resources" → "Memory Usage" → binary memory line
   def do_binary_abuse(seconds) do
     deadline = deadline(seconds)
     binary_abuse_loop(deadline, [], 0)
@@ -735,6 +845,11 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # MESSAGE QUEUE PRESSURE
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "message_queue.cycle" with targets count → Tempo
+  ##   - Span events: "consumers_spawned", "messages_sent" (per_target + total), "consumers_killed"
+  ##   - Telemetry: [:elixir_stress, :app, :messages, :sent] (count) → Mimir
+  ##     → Grafana: "App Metrics" → "Messages" → "Messages Sent"
   def do_message_queue_pressure(seconds) do
     deadline = deadline(seconds)
     msg_pressure_loop(deadline, 0)
@@ -797,6 +912,15 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # PORT CHURN
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "port_churn.cycle" with target_ports count → Tempo
+  ##   - Child spans: "ports.open", "ports.pump_data"
+  ##   - Span events: "ports_opened", "data_pumped" (total_bytes), "ports_closed"
+  ##   - Telemetry: [:elixir_stress, :app, :ports, :opened] (count) → Mimir
+  ##     → Grafana: "App Metrics" → "Ports" → "Ports Opened"
+  ##   - Telemetry: [:elixir_stress, :app, :ports, :closed] (count) → Mimir
+  ##     → Grafana: "App Metrics" → "Ports" → "Ports Closed"
+  ##   Also visible in: "Elixir Stress Test" → "BEAM Resources" → "Process / Port / Atom Counts" → port_count
   def do_port_churn(seconds) do
     deadline = deadline(seconds)
     port_churn_loop(deadline, 0)
@@ -866,6 +990,14 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # ATOM GROWTH
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "atom_growth.cycle" with batch_size → Tempo
+  ##   - Span events: "atoms_created" (batch count + system_atom_count)
+  ##   - Span attributes: system_atom_count
+  ##   - Log every 20 cycles (WARNING): "Atom growth: N atoms in system" → Loki
+  ##     → Grafana: "Elixir Stress Test" → "Application Logs" + "Log Volume by Severity" (WARNING)
+  ##   Also visible in: "Elixir Stress Test" → "BEAM Resources" → "Process / Port / Atom Counts" → atom_count
+  ##   Also visible in: "Elixir Stress Test" → "BEAM Deep Metrics" → "Code & Atom Memory"
   def do_atom_growth(seconds) do
     deadline = deadline(seconds)
     atom_loop(deadline, 0, 0)
@@ -905,6 +1037,19 @@ defmodule ElixirStress.Stress do
   # ============================================================
   # DISTRIBUTED CALL (Tier 5)
   # ============================================================
+  ## OTEL Output (per cycle):
+  ##   - Span: "distributed_call.cycle" → Tempo
+  ##   - Child spans: "distributed.http_call" per endpoint (compute/store/transform)
+  ##     with http.method, http.url, peer.service, http.status_code, duration_ms attributes
+  ##   - Span events: "response_received" (status + duration)
+  ##   - On error: record_exception + set_status(:error) + error log → Tempo + Loki
+  ##   - Telemetry: [:elixir_stress, :app, :distributed, :call] (duration by endpoint+status) → Mimir
+  ##     → Grafana: "App Metrics" → "Distributed Calls" → "Call Duration" histogram + "Call Count"
+  ##   - Telemetry: [:elixir_stress, :app, :distributed, :error] (count by endpoint) → Mimir
+  ##     → Grafana: "App Metrics" → "Distributed Calls" → "Error Count"
+  ##   - Logs: debug/error per call → Loki → Grafana: "Elixir Stress Test" → "Application Logs"
+  ##   → Cross-service traces visible in Grafana: Explore → Tempo → shows spans from both
+  ##     "elixir_stress" and "worker_service" in the same trace waterfall
   def do_distributed_call(seconds) do
     deadline = deadline(seconds)
     distributed_loop(deadline, 0, 0, 0)
@@ -1008,6 +1153,13 @@ defmodule ElixirStress.Stress do
     {successes, failures}
   end
 
+  ## OTEL Gathering: Injects current span context as W3C traceparent/tracestate HTTP headers
+  ##   These headers are sent with HTTP calls to the worker service (:4003)
+  ##   The worker service extracts them via :otel_propagator_text_map.extract/1
+  ##   This creates a connected distributed trace across service boundaries
+  ## OTEL Output: Headers like "traceparent: 00-<trace_id>-<span_id>-01" in outbound HTTP requests
+  ##   → Worker service creates child spans under the same trace_id
+  ##   → Tempo → Grafana: Explore → Tempo → single trace shows spans from both services
   defp inject_trace_context do
     carrier = :otel_propagator_text_map.inject([])
     Enum.map(carrier, fn {k, v} -> {to_string(k), to_string(v)} end)

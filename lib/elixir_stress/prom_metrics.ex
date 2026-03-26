@@ -1,5 +1,34 @@
 defmodule ElixirStress.PromMetrics do
-  @moduledoc false
+  @moduledoc """
+  Prometheus metrics exporter and custom telemetry poller measurements.
+
+  ## OTEL Overview
+  This module defines all Prometheus metrics and polls the BEAM VM for deep metrics every 5 seconds.
+
+  ### OTEL Gathering (inputs)
+  - Telemetry events from stress.ex, otel_stress.ex, and router.ex via `:telemetry.execute/3`
+  - BEAM VM statistics via :erlang.statistics/1, :erlang.memory/0, :erlang.system_info/1
+  - Custom poller measurements every 5s: scheduler utilization, reductions, GC, IO, ETS, memory
+
+  ### OTEL Output (destinations)
+  - All metrics are exposed at GET /metrics on port 4001 in Prometheus text format
+  - OTel Collector scrapes /metrics every 5s (configured in otel-collector-config.yml)
+  - Flow: :telemetry events → TelemetryMetricsPrometheus.Core → /metrics → OTel Collector → Mimir
+  - **Grafana locations by metric group:**
+    - VM Memory → "Elixir Stress Test" → "BEAM Resources" → "Memory Usage"
+    - Run Queues → "Elixir Stress Test" → "BEAM Resources" → "Run Queue Lengths"
+    - System Counts → "Elixir Stress Test" → "BEAM Resources" → "Process / Port / Atom Counts"
+    - Scheduler Util → "Elixir Stress Test" → "BEAM Deep Metrics" → "Scheduler Utilization"
+    - Reductions → "Elixir Stress Test" → "BEAM Deep Metrics" → "Reductions/sec"
+    - GC → "Elixir Stress Test" → "BEAM Deep Metrics" → "GC Rate"
+    - IO → "Elixir Stress Test" → "BEAM Deep Metrics" → "System I/O Throughput"
+    - ETS → "Elixir Stress Test" → "BEAM Deep Metrics" → "ETS Tables & Memory" + "ETS Table Count"
+    - Code/Atom Memory → "Elixir Stress Test" → "BEAM Deep Metrics" → "Code & Atom Memory"
+    - HTTP Requests → "Elixir Stress Test" → "BEAM Deep Metrics" → "HTTP Request Duration p95" + "HTTP Request Rate"
+    - Worker lifecycle → "Elixir Stress Test" → "Worker Activity" → all panels
+    - App metrics → "Elixir Stress - Application Metrics" → all panels
+    - OTel metric flood → "Elixir Stress Test" → "OTel Pipeline Stress" → "Metric Flood Events/s"
+  """
 
   use Supervisor
 
@@ -16,12 +45,18 @@ defmodule ElixirStress.PromMetrics do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
+  ## OTEL Output: Defines all Prometheus metrics that are scraped by the OTel Collector
+  ##   Each metric maps a :telemetry event to a Prometheus metric type (counter/gauge/histogram)
+  ##   Flow: :telemetry.execute → TelemetryMetricsPrometheus.Core → /metrics endpoint → OTel Collector → Mimir
   def prom_metrics do
     import Telemetry.Metrics
 
     [
       # =============================================
-      # VM Metrics
+      # VM Metrics (from :telemetry_poller built-in VM measurements)
+      # OTEL Gathering: telemetry_poller emits [:vm, :memory] every 10s (built-in)
+      # OTEL Output: Prometheus gauges scraped every 5s
+      #   → Mimir → Grafana: "Elixir Stress Test" → "BEAM Resources" → "Memory Usage"
       # =============================================
       last_value("vm.memory.total", unit: :byte),
       last_value("vm.memory.processes", unit: :byte),
@@ -29,49 +64,67 @@ defmodule ElixirStress.PromMetrics do
       last_value("vm.memory.ets", unit: :byte),
       last_value("vm.memory.atom", unit: :byte),
       last_value("vm.memory.system", unit: :byte),
+      ## OTEL Gathering: From measure_memory_extra/0 custom poller (code memory from :erlang.memory)
       last_value("vm.memory.code", unit: :byte),
+      ## OTEL Gathering: From measure_memory_extra/0 custom poller (:erlang.memory(:atom_used))
       last_value("vm.memory.atom_used", unit: :byte),
 
+      # OTEL Gathering: telemetry_poller emits [:vm, :total_run_queue_lengths] every 10s (built-in)
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "BEAM Resources" → "Run Queue Lengths"
       last_value("vm.total_run_queue_lengths.total"),
       last_value("vm.total_run_queue_lengths.cpu"),
       last_value("vm.total_run_queue_lengths.io"),
 
+      # OTEL Gathering: telemetry_poller emits [:vm, :system_counts] every 10s (built-in)
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "BEAM Resources" → "Process / Port / Atom Counts"
       last_value("vm.system_counts.process_count"),
       last_value("vm.system_counts.atom_count"),
       last_value("vm.system_counts.port_count"),
 
       # =============================================
-      # Scheduler Utilization
+      # Scheduler Utilization (custom poller)
+      # OTEL Gathering: From measure_scheduler_utilization/0 → :erlang.statistics(:scheduler_wall_time)
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "Scheduler Utilization"
       # =============================================
       last_value("vm.scheduler.utilization.weighted", description: "Weighted avg scheduler utilization 0-100%"),
       last_value("vm.scheduler.utilization.max", description: "Most loaded scheduler utilization 0-100%"),
 
       # =============================================
-      # Reductions
+      # Reductions (custom poller)
+      # OTEL Gathering: From measure_reductions/0 → :erlang.statistics(:reductions)
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "Reductions/sec"
       # =============================================
       last_value("vm.reductions.rate", description: "Reductions per second"),
 
       # =============================================
-      # GC Metrics
+      # GC Metrics (custom poller)
+      # OTEL Gathering: From measure_gc/0 → :erlang.statistics(:garbage_collection)
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "GC Rate"
       # =============================================
       last_value("vm.gc.count_rate", description: "GC runs per second"),
       last_value("vm.gc.duration_rate", description: "GC pause microseconds per second"),
       last_value("vm.gc.words_reclaimed_rate", description: "GC words reclaimed per second"),
 
       # =============================================
-      # IO Metrics
+      # IO Metrics (custom poller)
+      # OTEL Gathering: From measure_io/0 → :erlang.statistics(:io)
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "System I/O Throughput"
       # =============================================
       last_value("vm.io.input_rate", unit: :byte, description: "Bytes input per second"),
       last_value("vm.io.output_rate", unit: :byte, description: "Bytes output per second"),
 
       # =============================================
-      # ETS Global
+      # ETS Global (custom poller)
+      # OTEL Gathering: From measure_ets/0 → :ets.all() + :ets.info/2
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "ETS Tables & Memory" + "ETS Table Count"
       # =============================================
       last_value("vm.ets.table_count", description: "Total ETS tables"),
       last_value("vm.ets.total_memory", unit: :byte, description: "Total ETS memory across all tables"),
 
       # =============================================
       # HTTP Request Metrics
+      # OTEL Gathering: From router.ex measure_request plug → [:vm, :http, :request] telemetry events
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "HTTP Request Duration p95" + "HTTP Request Rate"
       # =============================================
       distribution("vm.http.request.duration",
         tags: [:path, :status],
@@ -82,13 +135,17 @@ defmodule ElixirStress.PromMetrics do
       counter("vm.http.request.count", tags: [:path, :status], description: "HTTP request count by path and status"),
 
       # =============================================
-      # Worker Lifecycle (existing)
+      # Worker Lifecycle
+      # OTEL Gathering: From stress.ex propagated_worker → [:elixir_stress, :worker, :start/:stop/:cycle]
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "Worker Activity" → all panels
       # =============================================
       counter("elixir_stress.worker.start.count", tags: [:worker]),
       counter("elixir_stress.worker.stop.count", tags: [:worker]),
       counter("elixir_stress.worker.cycle.count", tags: [:worker]),
       sum("elixir_stress.worker.cycle.value", tags: [:worker]),
 
+      # OTEL Gathering: From stress.ex run/1 and router.ex /stress trigger → [:elixir_stress, :run, :start/:stop]
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "Worker Activity" → "Stress Runs"
       counter("elixir_stress.run.start.count"),
       counter("elixir_stress.run.stop.count"),
       distribution("elixir_stress.run.stop.duration",
@@ -101,8 +158,9 @@ defmodule ElixirStress.PromMetrics do
       ),
 
       # =============================================
-      # Application Metrics — Cycle Duration (histogram-like via summary)
-      # Template: "How long does each operation take?"
+      # Application Metrics — Cycle Duration
+      # OTEL Gathering: From stress.ex timed_cycle/2 → [:elixir_stress, :app, :cycle_duration]
+      # OTEL Output → Mimir → Grafana: "App Metrics" → "Cycle Duration by Worker"
       # =============================================
       distribution("elixir_stress.app.cycle_duration.duration",
         tags: [:worker],
@@ -113,7 +171,8 @@ defmodule ElixirStress.PromMetrics do
 
       # =============================================
       # Application Metrics — Memory Operations
-      # Template: "How much is being allocated/released?"
+      # OTEL Gathering: From stress.ex memory_hog → [:elixir_stress, :app, :memory, :allocated/:released/:held]
+      # OTEL Output → Mimir → Grafana: "App Metrics" → "Memory Operations"
       # =============================================
       sum("elixir_stress.app.memory.allocated.bytes",
         tags: [:worker],
@@ -142,7 +201,8 @@ defmodule ElixirStress.PromMetrics do
 
       # =============================================
       # Application Metrics — Disk I/O
-      # Template: "How much data is moving through the system?"
+      # OTEL Gathering: From stress.ex disk_thrash → [:elixir_stress, :app, :disk, :written/:read]
+      # OTEL Output → Mimir → Grafana: "App Metrics" → "Disk I/O"
       # =============================================
       sum("elixir_stress.app.disk.written.bytes",
         tags: [:worker],
@@ -163,7 +223,8 @@ defmodule ElixirStress.PromMetrics do
 
       # =============================================
       # Application Metrics — Process Churn
-      # Template: "How much concurrency churn is happening?"
+      # OTEL Gathering: From stress.ex process_explosion → [:elixir_stress, :app, :processes, :spawned/:killed/:alive]
+      # OTEL Output → Mimir → Grafana: "App Metrics" → "Process Churn"
       # =============================================
       sum("elixir_stress.app.processes.spawned.count",
         tags: [:worker],
@@ -180,7 +241,8 @@ defmodule ElixirStress.PromMetrics do
 
       # =============================================
       # Application Metrics — Messages
-      # Template: "What is the throughput of the messaging system?"
+      # OTEL Gathering: From stress.ex message_queue_pressure → [:elixir_stress, :app, :messages, :sent]
+      # OTEL Output → Mimir → Grafana: "App Metrics" → "Messages"
       # =============================================
       sum("elixir_stress.app.messages.sent.count",
         tags: [:worker],
@@ -189,7 +251,8 @@ defmodule ElixirStress.PromMetrics do
 
       # =============================================
       # Application Metrics — Ports
-      # Template: "How many external resources are being churned?"
+      # OTEL Gathering: From stress.ex port_churn → [:elixir_stress, :app, :ports, :opened/:closed]
+      # OTEL Output → Mimir → Grafana: "App Metrics" → "Ports"
       # =============================================
       sum("elixir_stress.app.ports.opened.count",
         tags: [:worker],
@@ -202,7 +265,8 @@ defmodule ElixirStress.PromMetrics do
 
       # =============================================
       # Application Metrics — Distributed Calls
-      # Template: "How are downstream services performing?"
+      # OTEL Gathering: From stress.ex distributed_call → [:elixir_stress, :app, :distributed, :call/:error]
+      # OTEL Output → Mimir → Grafana: "App Metrics" → "Distributed Calls"
       # =============================================
       distribution("elixir_stress.app.distributed.call.duration",
         tags: [:endpoint, :status],
@@ -221,6 +285,8 @@ defmodule ElixirStress.PromMetrics do
 
       # =============================================
       # OTel Stress (Tier 4)
+      # OTEL Gathering: From otel_stress.ex metric_flood → [:elixir_stress, :otel, :metric_flood]
+      # OTEL Output → Mimir → Grafana: "Elixir Stress Test" → "OTel Pipeline Stress" → "Metric Flood Events/s"
       # =============================================
       counter("elixir_stress.otel.metric_flood.count",
         tags: [:endpoint, :method],
@@ -233,6 +299,9 @@ defmodule ElixirStress.PromMetrics do
     ]
   end
 
+  ## OTEL Gathering: Custom telemetry_poller measurements executed every 5 seconds
+  ##   Each function gathers BEAM VM statistics and emits telemetry events
+  ##   which are then converted to Prometheus metrics by TelemetryMetricsPrometheus.Core
   defp measurements do
     [
       {__MODULE__, :measure_scheduler_utilization, []},
@@ -245,6 +314,12 @@ defmodule ElixirStress.PromMetrics do
   end
 
   # --- Scheduler utilization via wall time ---
+  ## OTEL Gathering: Reads :erlang.statistics(:scheduler_wall_time) to compute per-scheduler
+  ##   utilization as a percentage. Calculates weighted average and max utilization across all schedulers.
+  ##   Uses :persistent_term to store previous readings for delta calculation.
+  ## OTEL Output: Telemetry event [:vm, :scheduler, :utilization] with {weighted, max} measurements
+  ##   → Prometheus: vm_scheduler_utilization_weighted, vm_scheduler_utilization_max
+  ##   → OTel Collector → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "Scheduler Utilization"
   def measure_scheduler_utilization do
     case :persistent_term.get({__MODULE__, :prev_scheduler_wall_time}, nil) do
       nil ->
@@ -270,6 +345,11 @@ defmodule ElixirStress.PromMetrics do
   end
 
   # --- Reductions per second ---
+  ## OTEL Gathering: Reads :erlang.statistics(:reductions) — total reductions since VM start
+  ##   Computes rate by comparing with previous reading stored in :persistent_term
+  ## OTEL Output: Telemetry event [:vm, :reductions] with {rate} measurement (reductions/sec)
+  ##   → Prometheus: vm_reductions_rate
+  ##   → OTel Collector → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "Reductions/sec"
   def measure_reductions do
     {total, _since_last} = :erlang.statistics(:reductions)
     now = System.monotonic_time(:millisecond)
@@ -287,6 +367,11 @@ defmodule ElixirStress.PromMetrics do
   end
 
   # --- GC metrics ---
+  ## OTEL Gathering: Reads :erlang.statistics(:garbage_collection) — {gc_count, gc_words, 0}
+  ##   Computes rates by comparing with previous readings stored in :persistent_term
+  ## OTEL Output: Telemetry event [:vm, :gc] with {count_rate, duration_rate, words_reclaimed_rate}
+  ##   → Prometheus: vm_gc_count_rate, vm_gc_duration_rate, vm_gc_words_reclaimed_rate
+  ##   → OTel Collector → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "GC Rate"
   def measure_gc do
     {gc_count, gc_words, _} = :erlang.statistics(:garbage_collection)
     now = System.monotonic_time(:millisecond)
@@ -311,6 +396,11 @@ defmodule ElixirStress.PromMetrics do
   end
 
   # --- IO bytes in/out per second ---
+  ## OTEL Gathering: Reads :erlang.statistics(:io) — {{:input, bytes_in}, {:output, bytes_out}}
+  ##   Computes bytes/sec rates by comparing with previous readings stored in :persistent_term
+  ## OTEL Output: Telemetry event [:vm, :io] with {input_rate, output_rate} in bytes/sec
+  ##   → Prometheus: vm_io_input_rate_bytes, vm_io_output_rate_bytes
+  ##   → OTel Collector → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "System I/O Throughput"
   def measure_io do
     {{:input, input}, {:output, output}} = :erlang.statistics(:io)
     now = System.monotonic_time(:millisecond)
@@ -330,6 +420,11 @@ defmodule ElixirStress.PromMetrics do
   end
 
   # --- ETS global stats ---
+  ## OTEL Gathering: Iterates :ets.all() to count tables and sum memory across all ETS tables
+  ##   Memory is calculated as: :ets.info(tab, :memory) * :erlang.system_info(:wordsize)
+  ## OTEL Output: Telemetry event [:vm, :ets] with {table_count, total_memory}
+  ##   → Prometheus: vm_ets_table_count, vm_ets_total_memory_bytes
+  ##   → OTel Collector → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "ETS Tables & Memory" + "ETS Table Count"
   def measure_ets do
     tables = :ets.all()
     table_count = length(tables)
@@ -347,6 +442,10 @@ defmodule ElixirStress.PromMetrics do
   end
 
   # --- Extra memory breakdowns ---
+  ## OTEL Gathering: Reads :erlang.memory() for code memory and :erlang.memory(:atom_used) for used atoms
+  ## OTEL Output: Telemetry event [:vm, :memory] with {code, atom_used}
+  ##   → Prometheus: vm_memory_code_bytes, vm_memory_atom_used_bytes
+  ##   → OTel Collector → Mimir → Grafana: "Elixir Stress Test" → "BEAM Deep Metrics" → "Code & Atom Memory"
   def measure_memory_extra do
     mem = :erlang.memory()
     code = Keyword.get(mem, :code, 0)
@@ -361,6 +460,10 @@ defmodule ElixirStress.PromMetrics do
     :telemetry.execute([:vm, :memory], %{code: code, atom_used: atom_used})
   end
 
+  ## OTEL Output: Scrapes all accumulated Prometheus metrics as text format
+  ##   Called by router.ex GET /metrics endpoint
+  ##   → OTel Collector scrapes this every 5s (configured in otel-collector-config.yml)
+  ##   → Mimir → Grafana: all metric panels across both dashboards
   def scrape do
     TelemetryMetricsPrometheus.Core.scrape(:elixir_stress_prom)
   rescue
