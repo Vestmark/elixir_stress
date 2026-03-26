@@ -56,13 +56,21 @@ mix deps.get
 mix compile
 ```
 
-**Note:** If behind a corporate TLS proxy (e.g. Zscaler) on macOS:
+**Note:** If behind a corporate TLS proxy (e.g. Zscaler):
 
+**macOS:**
 ```bash
 security find-certificate -a -p /Library/Keychains/System.keychain \
   /System/Library/Keychains/SystemRootCertificates.keychain > /tmp/all_cas.pem
 
 HEX_CACERTS_PATH=/tmp/all_cas.pem mix deps.get
+```
+
+**Linux:**
+```bash
+export HEX_CACERTS_PATH=/etc/ssl/certs/ca-certificates.crt
+export HEX_UNSAFE_HTTPS=1
+mix deps.get
 ```
 
 ### 2. Start the Grafana LGTM stack (Docker)
