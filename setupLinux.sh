@@ -164,27 +164,68 @@ if [[ "$SKIP_INSTALL" == false ]]; then
   fi
 
   # --- Elixir ---
+  NEED_ELIXIR_UPGRADE=false
   if command -v elixir &>/dev/null; then
     elixir_version=$(elixir --version 2>/dev/null | grep "Elixir" | awk '{print $2}')
-    ok "Elixir $elixir_version installed"
-  else
-    if command -v asdf &>/dev/null; then
-      info "Installing Elixir via asdf..."
-      asdf plugin add elixir 2>/dev/null || true
-      asdf install elixir latest
-      asdf global elixir latest
-      ok "Elixir installed via asdf"
-    elif [[ "$PKG" == "apt" ]]; then
-      info "Installing Elixir via apt..."
-      sudo apt-get install -y -qq elixir >/dev/null 2>&1
-      ok "Elixir installed"
-    elif [[ "$PKG" == "dnf" || "$PKG" == "yum" ]]; then
-      info "Installing Elixir via $PKG..."
-      sudo $PKG install -y elixir >/dev/null 2>&1
-      ok "Elixir installed"
+    # Extract major and minor version numbers
+    major_version=$(echo "$elixir_version" | cut -d. -f1)
+    minor_version=$(echo "$elixir_version" | cut -d. -f2)
+    # Check if version is >= 1.19
+    if [[ "$major_version" -lt 1 ]] || [[ "$major_version" -eq 1 && "$minor_version" -lt 19 ]]; then
+      warn "Elixir $elixir_version is too old (need >= 1.19)"
+      NEED_ELIXIR_UPGRADE=true
     else
-      fail "Cannot install Elixir automatically. Please install manually."
-      echo "  See: https://elixir-lang.org/install.html"
+      ok "Elixir $elixir_version installed"
+    fi
+  else
+    NEED_ELIXIR_UPGRADE=true
+  fi
+
+  if [[ "$NEED_ELIXIR_UPGRADE" == true ]]; then
+    # Ensure asdf is installed
+    if ! command -v asdf &>/dev/null; then
+      warn "Elixir 1.19+ not available in system repos. Installing asdf..."
+      if [[ ! -d "$HOME/.asdf" ]]; then
+        git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.14.0 2>&1 | tail -3
+        echo '. "$HOME/.asdf/asdf.sh"' >> ~/.bashrc
+        echo '. "$HOME/.asdf/completions/asdf.bash"' >> ~/.bashrc
+        ok "asdf installed"
+      fi
+      # Source asdf in current shell
+      source "$HOME/.asdf/asdf.sh"
+    fi
+
+    # Check Erlang/OTP version - Elixir 1.19+ requires OTP 26+
+    if command -v erl &>/dev/null; then
+      otp_version=$(erl -eval 'io:format("~s", [erlang:system_info(otp_release)]), halt().' -noshell 2>/dev/null || echo "0")
+      if [[ "$otp_version" -lt 26 ]]; then
+        warn "Elixir 1.19+ requires Erlang/OTP 26+, but you have OTP $otp_version"
+        info "Installing Erlang/OTP 27 via asdf..."
+        asdf plugin add erlang 2>/dev/null || true
+        asdf install erlang 27.2 2>&1 | tail -5
+        asdf global erlang 27.2
+        export PATH="$HOME/.asdf/shims:$PATH"
+        ok "Erlang/OTP 27 installed via asdf"
+      fi
+    fi
+
+    info "Installing Elixir 1.19+ via asdf..."
+    asdf plugin add elixir 2>/dev/null || true
+
+    # Install latest Elixir 1.19.x for OTP 27
+    info "Fetching and installing Elixir 1.19.5-otp-27..."
+    asdf install elixir 1.19.5-otp-27 2>&1 | tail -10
+    asdf global elixir 1.19.5-otp-27
+
+    # Ensure asdf shims are in PATH for this script
+    export PATH="$HOME/.asdf/shims:$PATH"
+
+    # Verify installation
+    if command -v elixir &>/dev/null; then
+      new_version=$(elixir --version 2>/dev/null | grep "Elixir" | awk '{print $2}')
+      ok "Elixir $new_version installed via asdf"
+    else
+      fail "Elixir installation failed"
       exit 1
     fi
   fi
@@ -238,16 +279,63 @@ info "Checking Docker daemon..."
 if docker info &>/dev/null; then
   ok "Docker is running"
 else
-  fail "Docker daemon is not running"
-  info "Attempting to start Docker..."
-  sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null || true
-  sleep 3
-  if docker info &>/dev/null; then
-    ok "Docker is now running"
-  else
-    fail "Could not start Docker. Please start it manually:"
-    echo "  sudo systemctl start docker"
-    exit 1
+  fail "Docker daemon is not accessible"
+
+  # Check if we're using Docker Desktop context but it's not running
+  CURRENT_CONTEXT=$(docker context show 2>/dev/null || echo "default")
+  if [[ "$CURRENT_CONTEXT" == "desktop-linux" ]] && [[ -f "$HOME/.docker/desktop/docker.sock" ]]; then
+    warn "Docker context is set to Docker Desktop, but it's not running"
+    info "Switching to native Docker Engine..."
+    docker context use default &>/dev/null || true
+
+    # Check if default context works
+    if docker info &>/dev/null; then
+      ok "Switched to native Docker Engine"
+    fi
+  fi
+
+  # If still not working, try to start native Docker Engine
+  if ! docker info &>/dev/null; then
+    info "Attempting to start Docker Engine (you may be prompted for your password)..."
+    if sudo systemctl start docker 2>&1; then
+      sleep 3
+      if docker info &>/dev/null; then
+        ok "Docker is now running"
+      else
+        warn "Docker service started but daemon not responding yet"
+        info "Waiting for Docker daemon to be ready..."
+        for i in $(seq 1 10); do
+          sleep 1
+          if docker info &>/dev/null; then
+            ok "Docker is now running"
+            break
+          fi
+        done
+        if ! docker info &>/dev/null; then
+          fail "Docker daemon still not responding"
+          echo "  This might be a permissions issue. Try:"
+          echo "  1. Log out and log back in (to refresh group membership)"
+          echo "  2. Or run: newgrp docker"
+          echo "  3. Then try the script again"
+          exit 1
+        fi
+      fi
+    elif sudo service docker start 2>&1; then
+      sleep 3
+      if docker info &>/dev/null; then
+        ok "Docker is now running"
+      else
+        fail "Could not communicate with Docker daemon"
+        echo "  Try: sudo systemctl status docker"
+        exit 1
+      fi
+    else
+      fail "Could not start Docker. Please start it manually:"
+      echo "  sudo systemctl start docker"
+      echo "  or"
+      echo "  sudo service docker start"
+      exit 1
+    fi
   fi
 fi
 
@@ -256,10 +344,18 @@ fi
 # ============================================================
 if [[ "$SKIP_INSTALL" == false ]]; then
   # Check for Zscaler cert in common locations
-  if find /usr/local/share/ca-certificates /etc/pki/ca-trust/source/anchors -name "*scaler*" -o -name "*Zscaler*" 2>/dev/null | grep -qi scaler; then
+  ZSCALER_FOUND=false
+  for dir in /usr/local/share/ca-certificates /etc/pki/ca-trust/source/anchors /etc/ssl/certs; do
+    if [[ -d "$dir" ]] && find "$dir" -maxdepth 1 -iname "*zscaler*" 2>/dev/null | grep -q .; then
+      ZSCALER_FOUND=true
+      break
+    fi
+  done
+
+  if [[ "$ZSCALER_FOUND" == true ]]; then
     warn "Zscaler TLS proxy detected"
-    # On Linux the system CA bundle is usually already updated via update-ca-certificates
-    # but Hex/Erlang may need an explicit path
+
+    # Find system CA bundle
     CA_BUNDLE=""
     for path in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/certs/ca-bundle.crt; do
       if [[ -f "$path" ]]; then
@@ -267,9 +363,20 @@ if [[ "$SKIP_INSTALL" == false ]]; then
         break
       fi
     done
+
     if [[ -n "$CA_BUNDLE" ]]; then
+      # Export multiple SSL-related environment variables for Erlang/Hex
       export HEX_CACERTS_PATH="$CA_BUNDLE"
-      ok "HEX_CACERTS_PATH set to $CA_BUNDLE"
+      export HEX_UNSAFE_HTTPS="1"
+      export SSL_CERT_FILE="$CA_BUNDLE"
+      export CURL_CA_BUNDLE="$CA_BUNDLE"
+      ok "SSL certificates configured for Zscaler"
+      ok "  HEX_CACERTS_PATH=$CA_BUNDLE"
+      ok "  HEX_UNSAFE_HTTPS=1"
+    else
+      fail "Could not find system CA bundle"
+      echo "  You may need to manually set HEX_CACERTS_PATH"
+      exit 1
     fi
   fi
 fi
